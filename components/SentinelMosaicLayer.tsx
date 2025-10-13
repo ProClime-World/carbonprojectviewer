@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { TileLayer } from 'react-leaflet';
-import { sentinelMosaicService, SentinelItem, MosaicConfig } from '@/lib/sentinelMosaic';
+import { sentinelMosaicService, SentinelItem } from '@/lib/sentinelMosaic';
 import { clientMosaicApi, LocalMosaicInfo } from '@/lib/clientMosaicApi';
 
 interface SentinelMosaicLayerProps {
@@ -24,6 +24,7 @@ export default function SentinelMosaicLayer({
 
   useEffect(() => {
     loadMosaicForYear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, bbox]);
 
   const loadMosaicForYear = async () => {

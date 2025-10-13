@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Polygon as PolygonType, Coordinate } from '@/lib/kmlParser';
+import { Polygon as PolygonType } from '@/lib/kmlParser';
 import { computePolygonAreaSqKm, km2ToHectares, formatAreaHa } from '@/lib/geo';
 
 interface PolygonSidebarProps {
@@ -74,8 +74,8 @@ export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: Po
                 key={idx}
                 onClick={() => onSelect(row.originalIndex)}
                 className={
-                  'cursor-pointer hover:bg-green-50 ' +
-                  (selectedIndex === row.originalIndex ? 'bg-green-100' : '')
+                  'cursor-pointer hover:bg-purple-50 ' +
+                  (selectedIndex === row.originalIndex ? 'bg-purple-100' : '')
                 }
               >
                 <td className="px-3 py-2 text-gray-700">{row.id}</td>

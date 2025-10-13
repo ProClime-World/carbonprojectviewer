@@ -17,6 +17,15 @@ export interface ParseProgress {
   currentPolygon: string;
 }
 
+interface KMLPlacemark {
+  name?: string;
+  description?: string;
+  Polygon?: unknown;
+  MultiGeometry?: {
+    Polygon?: unknown;
+  };
+}
+
 export function parseKML(kmlContent: string, onProgress?: (progress: ParseProgress) => void): Polygon[] {
   console.log('🔍 Starting KML parsing...');
   console.log('📄 KML content length:', kmlContent.length);
@@ -42,7 +51,7 @@ export function parseKML(kmlContent: string, onProgress?: (progress: ParseProgre
   console.log('📊 Document structure:', document ? Object.keys(document) : 'No document found');
   
   // Look for placemarks in folders or directly in document
-  let placemarks = [];
+  let placemarks: KMLPlacemark[] = [];
   
   // Check if there are folders first
   if (document.Folder) {
@@ -133,7 +142,7 @@ function parseCoordinates(coordString: string): Coordinate[] {
   const points = coordString.trim().split(/\s+/);
 
   for (const point of points) {
-    const [lng, lat, alt] = point.split(',').map(Number);
+    const [lng, lat] = point.split(',').map(Number);
     if (!isNaN(lng) && !isNaN(lat)) {
       coords.push({ lat, lng });
     }

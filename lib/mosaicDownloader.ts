@@ -1,10 +1,9 @@
 // Mosaic Downloader and Processor
 // Downloads Sentinel-2 data and creates mosaic tiles
 
-import { sentinelMosaicService, SentinelItem, MosaicConfig } from './sentinelMosaic';
+import { sentinelMosaicService, SentinelItem } from './sentinelMosaic';
 import { localMosaicStorage, LocalMosaicInfo } from './localMosaicStorage';
 import sharp from 'sharp';
-import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 
@@ -55,7 +54,7 @@ export class MosaicDownloader {
     const bestScenes = sentinelMosaicService.selectBestScenes(items, 5);
     
     // Download and process scenes
-    const processedScenes = await this.processScenes(bestScenes, bbox);
+    const processedScenes = await this.processScenes(bestScenes);
     
     this.reportProgress('tiling', 60, 'Generating tiles...');
 
@@ -87,8 +86,8 @@ export class MosaicDownloader {
     return mosaicInfo;
   }
 
-  private async processScenes(scenes: SentinelItem[], bbox: [number, number, number, number]) {
-    const processedScenes = [];
+  private async processScenes(scenes: SentinelItem[]) {
+    const processedScenes: Array<{ id: string; data: Buffer; properties: SentinelItem['properties'] }> = [];
 
     for (let i = 0; i < scenes.length; i++) {
       const scene = scenes[i];
@@ -101,8 +100,9 @@ export class MosaicDownloader {
         if (scene.assets.visual?.href) {
           const response = await fetch(scene.assets.visual.href);
           if (response.ok) {
-            const buffer = await response.buffer();
-            
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
             // Process with Sharp for optimization
             const processed = await sharp(buffer)
               .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
@@ -125,7 +125,7 @@ export class MosaicDownloader {
   }
 
   private async generateTiles(
-    scenes: any[], 
+    scenes: Array<{ id: string; data: Buffer; properties: SentinelItem['properties'] }>, 
     year: number, 
     bbox: [number, number, number, number],
     maxZoom: number,
@@ -159,7 +159,7 @@ export class MosaicDownloader {
   }
 
   private async generateTileFromScenes(
-    scenes: any[], 
+    scenes: Array<{ id: string; data: Buffer; properties: SentinelItem['properties'] }>, 
     z: number, 
     x: number, 
     y: number, 
@@ -194,8 +194,8 @@ export class MosaicDownloader {
     }
 
     let totalSize = 0;
-    const files = fs.readdirSync(mosaicDir, { recursive: true });
-    
+    const files = fs.readdirSync(mosaicDir, { recursive: true, encoding: 'utf8' });
+
     for (const file of files) {
       const filePath = path.join(mosaicDir, file);
       if (fs.statSync(filePath).isFile()) {

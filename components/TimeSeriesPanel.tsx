@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import { Coordinate, Polygon as PolygonType } from '@/lib/kmlParser';
+import React from 'react';
+import { Polygon as PolygonType } from '@/lib/kmlParser';
 import { getWaybackTileUrlForYear, getWaybackAttribution, fetchWaybackForYear } from '@/lib/wayback';
 
 // Lazy load MapView tiles for small cards via react-leaflet TileLayer directly
@@ -29,15 +28,6 @@ export default function TimeSeriesPanel({ years, selectedYear, polygon }: TimeSe
 
   const coords = rings.map(c => [c.lat, c.lng] as [number, number]);
 
-  function FitToPolygon() {
-    const map = useMap();
-    if (coords.length > 0) {
-      const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [10, 10] });
-    }
-    return null;
-  }
-
   return (
     <div className="w-96 h-full border-l bg-white flex flex-col">
       <div className="p-4 border-b">
@@ -54,6 +44,17 @@ export default function TimeSeriesPanel({ years, selectedYear, polygon }: TimeSe
   );
 }
 
+function FitToPolygon({ coords }: { coords: [number, number][] }) {
+  const map = useMap();
+  React.useEffect(() => {
+    if (coords.length > 0) {
+      const bounds = L.latLngBounds(coords);
+      map.fitBounds(bounds, { padding: [10, 10] });
+    }
+  }, [coords, map]);
+  return null;
+}
+
 function CardForYear({ year, coords, highlight }: { year: number; coords: [number, number][]; highlight: boolean }) {
   const [tileUrl, setTileUrl] = React.useState<string>(getWaybackTileUrlForYear(year));
   const [attr, setAttr] = React.useState<string>(getWaybackAttribution(year));
@@ -63,7 +64,10 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
     let mounted = true;
     fetchWaybackForYear(year).then((data) => {
       if (!mounted) return;
-      setTileUrl(data.url);
+      // Add cache-buster so browser doesn't reuse previous year's tiles
+      const cb = `cb=${year}`;
+      const finalUrl = data.url.includes('?') ? `${data.url}&${cb}` : `${data.url}?${cb}`;
+      setTileUrl(finalUrl);
       setAttr(data.attribution);
       if (data.releaseId && data.releaseDate) {
         const yearStr = new Date(data.releaseDate).toISOString().slice(0, 10);
@@ -82,9 +86,9 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
       <div className="h-48">
         <MapContainer center={coords[0]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
           <TileLayer url={tileUrl} attribution={attr} />
-          <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#10b981', weight: 2, fillOpacity: 0.2 }} />
+          <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#2d1b4e', weight: 2, fillOpacity: 0.2 }} />
           {/* Fit bounds per card */}
-          <FitToPolygon />
+          <FitToPolygon coords={coords} />
         </MapContainer>
       </div>
     </div>

@@ -4,12 +4,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinate } from '@/lib/kmlParser';
-import { sentinelMosaicService, SentinelItem } from '@/lib/sentinelMosaic';
+import { SentinelItem } from '@/lib/sentinelMosaic';
 import SentinelMosaicLayer from './SentinelMosaicLayer';
 import L from 'leaflet';
 
 // Fix for default marker icons in react-leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl as unknown as undefined;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -43,7 +43,7 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0); // Force map re-render
   const [mosaicItems, setMosaicItems] = useState<SentinelItem[]>([]);
-  const [isLoadingMosaic, setIsLoadingMosaic] = useState(false);
+  const [isLoadingMosaic] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -108,10 +108,7 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
     );
   }
 
-  // Get attribution for Sentinel-2 mosaics
-  const getAttribution = (year: number) => {
-    return `&copy; <a href="https://sentinel.esa.int/">Sentinel-2</a> ${year} • ESA/Copernicus`;
-  };
+  // Attribution handled inside layers
 
   return (
     <div className="relative w-full h-full">
@@ -164,8 +161,8 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
               key={`${idx}-${coordIdx}`}
               positions={coords.map(c => [c.lat, c.lng] as [number, number])}
               pathOptions={{
-                color: '#00ff00',
-                fillColor: '#00ff00',
+                color: '#2d1b4e',
+                fillColor: '#2d1b4e',
                 fillOpacity: 0.2,
                 weight: 2,
               }}

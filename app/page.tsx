@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import PolygonSidebar from '@/components/PolygonSidebar';
-import TimeSeriesPanel from '@/components/TimeSeriesPanel';
 import { parseKML, Polygon, ParseProgress } from '@/lib/kmlParser';
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
@@ -14,6 +13,11 @@ const MapView = dynamic(() => import('@/components/MapView'), {
       <p>Loading map...</p>
     </div>
   ),
+});
+
+// Dynamically import TimeSeriesPanel to avoid SSR issues with Leaflet
+const TimeSeriesPanel = dynamic(() => import('@/components/TimeSeriesPanel'), {
+  ssr: false,
 });
 
 const YEARS = [2017, 2021, 2025];
@@ -78,8 +82,9 @@ export default function Home() {
         setError(`Failed to load KML file: ${response.status} ${response.statusText}`);
       }
     } catch (err) {
-      console.error('❌ Error loading KML file:', err);
-      setError(`Failed to load KML file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('❌ Error loading KML file:', message);
+      setError(`Failed to load KML file: ${message}`);
     } finally {
       setIsLoading(false);
       console.log('🏁 Loading complete');
@@ -102,7 +107,7 @@ export default function Home() {
       });
       setPolygons(parsedPolygons);
       setParseProgress(null);
-    } catch (err) {
+    } catch {
       setError('Failed to parse KML file');
     } finally {
       setIsLoading(false);
@@ -112,9 +117,9 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <header className="bg-green-700 text-white p-4 shadow-lg">
+      <header className="bg-[#2d1b4e] text-white p-4 shadow-lg">
         <h1 className="text-2xl font-bold">Carbon Project Viewer</h1>
-        <p className="text-sm text-green-100">Visualize carbon project polygons with satellite imagery</p>
+        <p className="text-sm text-gray-300">Visualize carbon project polygons with satellite imagery</p>
       </header>
 
       {/* Controls */}
@@ -130,7 +135,7 @@ export default function Home() {
               type="file"
               accept=".kml"
               onChange={handleFileUpload}
-              className="text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+              className="text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-[#2d1b4e] hover:file:bg-purple-100"
             />
           </div>
 
@@ -150,7 +155,7 @@ export default function Home() {
                   }}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     selectedYear === year
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-[#2d1b4e] text-white'
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
                 >
@@ -177,18 +182,18 @@ export default function Home() {
 
         {/* Progress Indicator */}
         {parseProgress && (
-          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+          <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-md">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-700">
+              <span className="text-sm text-purple-700">
                 Processing: {parseProgress.currentPolygon}
               </span>
-              <span className="text-sm text-green-600">
+              <span className="text-sm text-purple-600">
                 {parseProgress.processed} / {parseProgress.total}
               </span>
             </div>
-            <div className="w-full bg-green-200 rounded-full h-2">
+            <div className="w-full bg-purple-200 rounded-full h-2">
               <div
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                className="bg-[#2d1b4e] h-2 rounded-full transition-all duration-300"
                 style={{
                   width: `${(parseProgress.processed / parseProgress.total) * 100}%`,
                 }}
@@ -229,7 +234,7 @@ export default function Home() {
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d1b4e] mx-auto mb-4"></div>
               <p className="text-gray-600">
                 {parseProgress ? 'Processing KML file...' : 'Loading...'}
               </p>

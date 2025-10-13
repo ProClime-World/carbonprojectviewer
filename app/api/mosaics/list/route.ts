@@ -8,6 +8,6 @@ export async function GET() {
     return NextResponse.json(mosaics);
   } catch (error) {
     console.error('Error listing mosaics:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new Response('Internal Server Error', { status: 500 });
   }
 }

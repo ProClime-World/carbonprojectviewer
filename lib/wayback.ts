@@ -5,7 +5,12 @@ type YearToTileUrl = Record<number, string>;
 
 // Configure known Wayback releases here per year.
 // If a year is not configured, we fall back to Esri World Imagery.
-const YEAR_TO_WAYBACK: YearToTileUrl = {};
+// Pre-pin distinct Wayback releases for demo/consistency. Adjust as needed.
+const YEAR_TO_WAYBACK: YearToTileUrl = {
+  2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=157',
+  2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=268',
+  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=340',
+};
 
 const DEFAULT_ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
@@ -29,8 +34,10 @@ export async function fetchWaybackForYear(year: number): Promise<{ url: string; 
       YEAR_TO_WAYBACK[year] = data.url;
     }
     return data;
-  } catch (e) {
-    return { url: DEFAULT_ESRI, attribution: 'Esri World Imagery', releaseId: null, releaseDate: null };
+  } catch {
+    const fallbackUrl = YEAR_TO_WAYBACK[year] || DEFAULT_ESRI;
+    const fallbackAttr = YEAR_TO_WAYBACK[year] ? 'Esri Wayback Imagery' : 'Esri World Imagery';
+    return { url: fallbackUrl, attribution: fallbackAttr, releaseId: null, releaseDate: null };
   }
 }
 

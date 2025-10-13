@@ -1,23 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 interface WaybackRelease {
   releaseId: number;
   releaseDate: string; // ISO date
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { year: string } }
-) {
+export async function GET(_req: Request) {
   try {
-    const year = parseInt(params.year, 10);
+    const urlObj = new URL(_req.url);
+    // Expect path like /api/wayback/{year}
+    const segments = urlObj.pathname.split('/').filter(Boolean);
+    const yearStr = segments[segments.length - 1];
+    const year = parseInt(yearStr || '', 10);
     if (isNaN(year)) {
       return new NextResponse('Invalid year', { status: 400 });
     }
 
     // Fetch all Wayback releases
-    const url = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/releases?f=pjson';
-    const resp = await fetch(url, { cache: 'no-store' });
+    const apiUrl = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/releases?f=pjson';
+    const resp = await fetch(apiUrl, { cache: 'no-store' });
     if (!resp.ok) {
       throw new Error(`Wayback API error: ${resp.status}`);
     }
@@ -26,10 +27,10 @@ export async function GET(
 
     // Pick the latest release on or before Dec 31 of the target year
     const cutoff = new Date(`${year}-12-31T23:59:59Z`).getTime();
-    const eligible = releases
-      .map((r: any) => ({ releaseId: r.releaseId, releaseDate: r.releaseDate }))
-      .filter((r: WaybackRelease) => new Date(r.releaseDate).getTime() <= cutoff)
-      .sort((a: WaybackRelease, b: WaybackRelease) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    const eligible = (releases as Array<{ releaseId: number; releaseDate: string }>)
+      .map((r) => ({ releaseId: r.releaseId, releaseDate: r.releaseDate }))
+      .filter((r) => new Date(r.releaseDate).getTime() <= cutoff)
+      .sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
 
     const chosen = eligible[0] || null;
 

@@ -1,24 +1,23 @@
 // API route for serving mosaic tiles
-import { NextRequest, NextResponse } from 'next/server';
 import { localMosaicStorage } from '@/lib/localMosaicStorage';
-import path from 'path';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { params: string[] } }
-) {
+export async function GET(_req: Request) {
   try {
-    const { params: pathParams } = params;
+    const url = new URL(_req.url);
+    const prefix = '/api/mosaic-tiles/';
+    const idx = url.pathname.indexOf(prefix);
+    const rest = idx >= 0 ? url.pathname.slice(idx + prefix.length) : '';
+    const pathParams = rest.split('/').filter(Boolean);
     
     if (pathParams.length < 4) {
-      return new NextResponse('Invalid tile path', { status: 400 });
+      return new Response('Invalid tile path', { status: 400 });
     }
 
     const [hash, z, x, yWithExt] = pathParams;
     const [y, ext] = yWithExt.split('.');
     
     if (!z || !x || !y || !ext) {
-      return new NextResponse('Invalid tile parameters', { status: 400 });
+      return new Response('Invalid tile parameters', { status: 400 });
     }
 
     const zoom = parseInt(z);
@@ -28,11 +27,11 @@ export async function GET(
 
     // Validate parameters
     if (isNaN(zoom) || isNaN(tileX) || isNaN(tileY)) {
-      return new NextResponse('Invalid tile coordinates', { status: 400 });
+      return new Response('Invalid tile coordinates', { status: 400 });
     }
 
     if (!['png', 'jpg', 'webp'].includes(format)) {
-      return new NextResponse('Unsupported format', { status: 400 });
+      return new Response('Unsupported format', { status: 400 });
     }
 
     // For now, we'll need to find the mosaic by hash
@@ -41,7 +40,7 @@ export async function GET(
     const mosaic = mosaics.find(m => m.hash === hash);
     
     if (!mosaic) {
-      return new NextResponse('Mosaic not found', { status: 404 });
+      return new Response('Mosaic not found', { status: 404 });
     }
 
     // Get the tile data
@@ -55,7 +54,7 @@ export async function GET(
     );
 
     if (!tileData) {
-      return new NextResponse('Tile not found', { status: 404 });
+      return new Response('Tile not found', { status: 404 });
     }
 
     // Set appropriate headers
@@ -65,13 +64,12 @@ export async function GET(
     headers.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
     headers.set('Last-Modified', new Date().toUTCString());
 
-    return new NextResponse(tileData, {
-      status: 200,
-      headers
-    });
+    // Ensure body is a supported BodyInit type
+    const body = new Uint8Array(tileData);
+    return new Response(body, { status: 200, headers });
 
   } catch (error) {
     console.error('Error serving tile:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
