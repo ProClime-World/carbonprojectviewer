@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface WaybackRelease {
   releaseId: number;
   releaseDate: string; // ISO date
@@ -42,7 +45,7 @@ export async function GET(_req: Request) {
         attribution: 'Esri World Imagery',
         releaseId: null,
         releaseDate: null,
-      }, { headers: { 'Cache-Control': 'public, max-age=86400' } });
+      });
     }
 
     const tileUrl = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=${chosen.releaseId}`;
@@ -52,7 +55,7 @@ export async function GET(_req: Request) {
       attribution: 'Esri Wayback Imagery',
       releaseId: chosen.releaseId,
       releaseDate: chosen.releaseDate,
-    }, { headers: { 'Cache-Control': 'public, max-age=86400' } });
+    });
 
   } catch (err) {
     console.error('Wayback endpoint error:', err);

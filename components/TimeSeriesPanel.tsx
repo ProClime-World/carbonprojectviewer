@@ -64,14 +64,13 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
     let mounted = true;
     fetchWaybackForYear(year).then((data) => {
       if (!mounted) return;
-      // Add cache-buster so browser doesn't reuse previous year's tiles
-      const cb = `cb=${year}`;
-      const finalUrl = data.url.includes('?') ? `${data.url}&${cb}` : `${data.url}?${cb}`;
-      setTileUrl(finalUrl);
+      setTileUrl(data.url);
       setAttr(data.attribution);
       if (data.releaseId && data.releaseDate) {
         const yearStr = new Date(data.releaseDate).toISOString().slice(0, 10);
         setReleaseInfo(`#${data.releaseId} • ${yearStr}`);
+      } else {
+        setReleaseInfo(null);
       }
     });
     return () => { mounted = false; };
@@ -85,7 +84,7 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
       </div>
       <div className="h-48">
         <MapContainer center={coords[0]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
-          <TileLayer url={tileUrl} attribution={attr} />
+          <TileLayer key={`${year}-${tileUrl}`} url={tileUrl} attribution={attr} />
           <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#2d1b4e', weight: 2, fillOpacity: 0.2 }} />
           {/* Fit bounds per card */}
           <FitToPolygon coords={coords} />

@@ -26,7 +26,7 @@ export function getWaybackAttribution(year: number): string {
 
 export async function fetchWaybackForYear(year: number): Promise<{ url: string; attribution: string; releaseId: number | null; releaseDate: string | null; }> {
   try {
-    const resp = await fetch(`/api/wayback/${year}`, { cache: 'force-cache' });
+    const resp = await fetch(`/api/wayback/${year}`, { cache: 'no-store' });
     if (!resp.ok) throw new Error('Wayback fetch failed');
     const data = await resp.json();
     // Cache in memory for this session
