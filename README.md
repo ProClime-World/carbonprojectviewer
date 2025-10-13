@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Carbon Project Viewer
+
+A Next.js application for visualizing carbon project polygons from KML files with timeseries satellite imagery for years 2017, 2021, and 2025.
+
+## Features
+
+- **KML File Support**: Upload and parse KML files containing project polygons
+- **Interactive Map**: View polygons on an interactive Leaflet map with satellite imagery
+- **Timeseries Viewer**: Switch between satellite imagery from 2017, 2021, and 2025
+- **Responsive UI**: Clean, modern interface with Tailwind CSS
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ installed
+- A KML file with your carbon project polygons
+
+### Installation
+
+1. Navigate to the project directory:
+```bash
+cd carbon-project-viewer
+```
+
+2. Install dependencies (if not already installed):
+```bash
+npm install
+```
+
+3. (Optional) Place your KML file in the `public` folder:
+```bash
+# Copy your KML file to public/carbon-project.kml
+cp /path/to/your/file.kml public/carbon-project.kml
+```
+
+### Running the Application
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Building for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+### Adding KML Files
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+There are two ways to load a KML file:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Upload via UI**: Click the "Upload KML" button in the application header
+2. **Pre-load**: Place a file named `carbon-project.kml` in the `public` folder
 
-## Deploy on Vercel
+### Switching Between Years
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Use the year selector buttons (2017, 2021, 2025) to view satellite imagery from different time periods.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### KML File Format
+
+The application expects KML files with the following structure:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>Project Area 1</name>
+      <description>Description of the area</description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              lng1,lat1,0 lng2,lat2,0 lng3,lat3,0 lng1,lat1,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>
+```
+
+## Tech Stack
+
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Leaflet** - Interactive maps
+- **React Leaflet** - React components for Leaflet
+- **fast-xml-parser** - KML parsing
+
+## Project Structure
+
+```
+carbon-project-viewer/
+├── app/
+│   ├── page.tsx          # Main application page
+│   ├── layout.tsx        # Root layout
+│   └── globals.css       # Global styles
+├── components/
+│   └── MapView.tsx       # Map component with Leaflet
+├── lib/
+│   └── kmlParser.ts      # KML parsing utilities
+├── public/               # Static files (place KML here)
+└── package.json
+```
+
+## Notes
+
+- The satellite imagery is provided by Esri World Imagery
+- The application uses client-side rendering for map components to avoid SSR issues with Leaflet
+- Polygons are displayed with green color (#00ff00) for visibility
+
+## License
+
+MIT
