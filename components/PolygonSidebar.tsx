@@ -91,7 +91,7 @@ export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: Po
                   'cursor-pointer hover:bg-purple-50 ' +
                   (selectedIndex === row.originalIndex ? 'bg-purple-100' : '')
                 }
-                ref={el => rowRefs.current[idx] = el}
+                ref={el => { rowRefs.current[idx] = el; }}
               >
                 <td className="px-3 py-2 text-gray-700">{row.id}</td>
                 <td className="px-3 py-2">
