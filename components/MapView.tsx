@@ -19,14 +19,19 @@ L.Icon.Default.mergeOptions({
 interface MapViewProps {
   polygons: { coordinates: Coordinate[][] }[];
   selectedYear: number;
+  selectedIndex?: number | null;
+  onSelectPolygon?: (index: number) => void;
 }
 
-function MapController({ polygons }: { polygons: { coordinates: Coordinate[][] }[] }) {
+function MapController({ polygons, selectedIndex }: { polygons: { coordinates: Coordinate[][] }[]; selectedIndex: number | null }) {
   const map = useMap();
 
   useEffect(() => {
-    if (polygons.length > 0 && polygons[0].coordinates.length > 0) {
-      const allCoords = polygons.flatMap(p => p.coordinates.flat());
+    if (polygons.length > 0) {
+      const sourcePolys = selectedIndex !== null && selectedIndex !== undefined && polygons[selectedIndex]
+        ? [polygons[selectedIndex]]
+        : polygons;
+      const allCoords = sourcePolys.flatMap(p => p.coordinates.flat());
       if (allCoords.length > 0) {
         const bounds = L.latLngBounds(
           allCoords.map(c => [c.lat, c.lng] as [number, number])
@@ -34,12 +39,12 @@ function MapController({ polygons }: { polygons: { coordinates: Coordinate[][] }
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
       }
     }
-  }, [polygons, map]);
+  }, [polygons, selectedIndex, map]);
 
   return null;
 }
 
-export default function MapView({ polygons, selectedYear }: MapViewProps) {
+export default function MapView({ polygons, selectedYear, selectedIndex = null, onSelectPolygon }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0); // Force map re-render
   const [mosaicItems, setMosaicItems] = useState<SentinelItem[]>([]);
@@ -55,7 +60,7 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
     setMapKey(prev => prev + 1); // Force map re-render
   }, [selectedYear]);
 
-  // Calculate bounding box from polygons using useMemo to prevent infinite loops
+  // Calculate bounding box from polygons or selected polygon using useMemo
   const boundingBox = useMemo((): [number, number, number, number] => {
     console.log('🗺️ Calculating bounding box for', polygons.length, 'polygons');
     
@@ -65,7 +70,10 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
     }
     
     try {
-      const allCoords = polygons.flatMap(p => p.coordinates.flat());
+      const sourcePolys = selectedIndex !== null && selectedIndex !== undefined && polygons[selectedIndex]
+        ? [polygons[selectedIndex]]
+        : polygons;
+      const allCoords = sourcePolys.flatMap(p => p.coordinates.flat());
       if (allCoords.length === 0) {
         console.log('🗺️ No coordinates found, using global fallback');
         return [-180, -90, 180, 90]; // Global fallback
@@ -93,7 +101,7 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
       console.error('🗺️ Error calculating bounding box:', error);
       return [-180, -90, 180, 90]; // Global fallback
     }
-  }, [polygons]);
+  }, [polygons, selectedIndex]);
 
   const handleMosaicLoaded = (items: SentinelItem[]) => {
     setMosaicItems(items);
@@ -156,20 +164,26 @@ export default function MapView({ polygons, selectedYear }: MapViewProps) {
           onMosaicLoaded={handleMosaicLoaded}
         />
         {polygons.map((polygon, idx) =>
-          polygon.coordinates.map((coords, coordIdx) => (
-            <Polygon
-              key={`${idx}-${coordIdx}`}
-              positions={coords.map(c => [c.lat, c.lng] as [number, number])}
-              pathOptions={{
-                color: '#2d1b4e',
-                fillColor: '#2d1b4e',
-                fillOpacity: 0.2,
-                weight: 2,
-              }}
-            />
-          ))
+          polygon.coordinates.map((coords, coordIdx) => {
+            const isSelected = selectedIndex === idx;
+            return (
+              <Polygon
+                key={`${idx}-${coordIdx}`}
+                positions={coords.map(c => [c.lat, c.lng] as [number, number])}
+                pathOptions={{
+                  color: isSelected ? '#f59e0b' : '#2d1b4e',
+                  fillColor: isSelected ? '#f59e0b' : '#2d1b4e',
+                  fillOpacity: isSelected ? 0.25 : 0.12,
+                  weight: isSelected ? 3 : 2,
+                }}
+                eventHandlers={{
+                  click: () => onSelectPolygon?.(idx),
+                }}
+              />
+            );
+          })
         )}
-        <MapController polygons={polygons} />
+        <MapController polygons={polygons} selectedIndex={selectedIndex} />
       </MapContainer>
     </div>
   );

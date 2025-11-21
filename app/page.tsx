@@ -22,7 +22,29 @@ const TimeSeriesPanel = dynamic(() => import('@/components/TimeSeriesPanel'), {
 
 const YEARS = [2017, 2021, 2025];
 
+type Project = 'RRISL' | 'ECM';
+
+const PROJECT_CONFIG: Record<Project, { name: string; kmlFiles: string[] }> = {
+  RRISL: {
+    name: 'RRISL',
+    kmlFiles: ['carbon-project.kml'],
+  },
+  ECM: {
+    name: 'ECM',
+    kmlFiles: [
+      'Planted site-1-2-Vaharai.kml',
+      'Planting site Phase I-Muthur-completed.kml',
+      'Vaharai 2nd planting.kml',
+      'Vaharai planted site-01-I.kml',
+      'Vaharai Planted site-1-II.kml',
+      'Vaharai planted site-1-III.kml',
+      'Vaharai Planted site-2.kml',
+    ],
+  },
+};
+
 export default function Home() {
+  const [selectedProject, setSelectedProject] = useState<Project>('RRISL');
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(2017);
   const [selectedPolygonIndex, setSelectedPolygonIndex] = useState<number | null>(null);
@@ -33,58 +55,75 @@ export default function Home() {
   const [isChangingYear, setIsChangingYear] = useState(false);
 
   useEffect(() => {
-    // Automatically load the KML file on startup
+    // Automatically load the KML file(s) when project changes
     loadKMLFile();
-  }, []);
+  }, [selectedProject]);
 
   const loadKMLFile = async () => {
-    console.log('🔄 Starting to load KML file...');
+    console.log(`🔄 Starting to load KML file(s) for project: ${selectedProject}...`);
     setIsLoading(true);
     setError('');
     setParseProgress(null);
+    setSelectedPolygonIndex(null); // Reset selection when project changes
     
     try {
-      console.log('📡 Fetching /carbon-project.kml...');
-      const response = await fetch('/carbon-project.kml');
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (response.ok) {
-        const contentLength = response.headers.get('content-length');
-        console.log('📏 Content length:', contentLength);
+      const projectConfig = PROJECT_CONFIG[selectedProject];
+      const allPolygons: Polygon[] = [];
+      let totalFileSize = 0;
+
+      // Load all KML files for the selected project
+      for (let i = 0; i < projectConfig.kmlFiles.length; i++) {
+        const kmlFile = projectConfig.kmlFiles[i];
+        const filePath = `/data/${selectedProject}/${kmlFile}`;
         
-        if (contentLength) {
-          const sizeInMB = parseInt(contentLength) / (1024 * 1024);
-          setFileSize(sizeInMB);
-          console.log('📏 File size:', sizeInMB.toFixed(1), 'MB');
-          
-          if (sizeInMB > 10) {
-            setError(`Warning: Large file detected (${sizeInMB.toFixed(1)}MB). This may take a while to process.`);
+        console.log(`📡 Fetching ${filePath}... (${i + 1}/${projectConfig.kmlFiles.length})`);
+        const response = await fetch(filePath);
+        console.log(`📡 Response status for ${kmlFile}:`, response.status);
+        
+        if (response.ok) {
+          const contentLength = response.headers.get('content-length');
+          if (contentLength) {
+            const sizeInMB = parseInt(contentLength) / (1024 * 1024);
+            totalFileSize += sizeInMB;
+            console.log(`📏 File size for ${kmlFile}:`, sizeInMB.toFixed(1), 'MB');
           }
+          
+          console.log(`📄 Reading response text for ${kmlFile}...`);
+          const kmlContent = await response.text();
+          console.log(`📄 KML content length for ${kmlFile}:`, kmlContent.length);
+          
+          console.log(`🔍 Starting KML parsing for ${kmlFile}...`);
+          const parsedPolygons = parseKML(kmlContent, (progress) => {
+            console.log(`📊 Parse progress for ${kmlFile}:`, progress);
+            // Update progress to show which file is being processed
+            setParseProgress({
+              ...progress,
+              currentPolygon: `${kmlFile}: ${progress.currentPolygon}`,
+            });
+          });
+          
+          console.log(`✅ Parsing complete for ${kmlFile}. Polygons found:`, parsedPolygons.length);
+          allPolygons.push(...parsedPolygons);
+        } else {
+          console.error(`❌ Response not OK for ${kmlFile}:`, response.status, response.statusText);
+          setError(`Failed to load ${kmlFile}: ${response.status} ${response.statusText}`);
         }
-        
-        console.log('📄 Reading response text...');
-        const kmlContent = await response.text();
-        console.log('📄 KML content length:', kmlContent.length);
-        console.log('📄 First 200 chars:', kmlContent.substring(0, 200));
-        
-        console.log('🔍 Starting KML parsing...');
-        const parsedPolygons = parseKML(kmlContent, (progress) => {
-          console.log('📊 Parse progress:', progress);
-          setParseProgress(progress);
-        });
-        
-        console.log('✅ Parsing complete. Polygons found:', parsedPolygons.length);
-        setPolygons(parsedPolygons);
-        setParseProgress(null);
-      } else {
-        console.error('❌ Response not OK:', response.status, response.statusText);
-        setError(`Failed to load KML file: ${response.status} ${response.statusText}`);
       }
+
+      if (totalFileSize > 0) {
+        setFileSize(totalFileSize);
+        if (totalFileSize > 10) {
+          setError(`Warning: Large file(s) detected (${totalFileSize.toFixed(1)}MB total). This may take a while to process.`);
+        }
+      }
+
+      console.log(`✅ All files loaded. Total polygons found:`, allPolygons.length);
+      setPolygons(allPolygons);
+      setParseProgress(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ Error loading KML file:', message);
-      setError(`Failed to load KML file: ${message}`);
+      console.error('❌ Error loading KML file(s):', message);
+      setError(`Failed to load KML file(s): ${message}`);
     } finally {
       setIsLoading(false);
       console.log('🏁 Loading complete');
@@ -125,6 +164,25 @@ export default function Home() {
       {/* Controls */}
       <div className="bg-white border-b shadow-sm p-4">
         <div className="flex flex-wrap items-center gap-4">
+          {/* Project Selector */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="project-select" className="text-sm font-medium text-gray-700">
+              Project:
+            </label>
+            <select
+              id="project-select"
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value as Project)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d1b4e] focus:border-transparent"
+            >
+              {Object.entries(PROJECT_CONFIG).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.name} ({config.kmlFiles.length} {config.kmlFiles.length === 1 ? 'site' : 'sites'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* File Upload */}
           <div className="flex items-center gap-2">
             <label htmlFor="kml-upload" className="text-sm font-medium text-gray-700">
@@ -268,9 +326,12 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <MapView polygons={
-            selectedPolygonIndex !== null ? [polygons[selectedPolygonIndex]] : polygons
-          } selectedYear={selectedYear} />
+          <MapView
+            polygons={polygons}
+            selectedYear={selectedYear}
+            selectedIndex={selectedPolygonIndex}
+            onSelectPolygon={(idx) => setSelectedPolygonIndex(idx)}
+          />
         )}
         </div>
 

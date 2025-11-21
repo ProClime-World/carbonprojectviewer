@@ -19,6 +19,8 @@ export async function GET(_req: Request) {
       return new NextResponse('Invalid year', { status: 400 });
     }
 
+    // Prefer the release closest to mid-year so each year has a distinct slice
+
     // Fetch all Wayback releases
     const apiUrl = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/releases?f=pjson';
     const resp = await fetch(apiUrl, { cache: 'no-store' });
@@ -28,14 +30,12 @@ export async function GET(_req: Request) {
     const data = await resp.json();
     const releases: WaybackRelease[] = data?.releases || [];
 
-    // Pick the latest release on or before Dec 31 of the target year
-    const cutoff = new Date(`${year}-12-31T23:59:59Z`).getTime();
-    const eligible = (releases as Array<{ releaseId: number; releaseDate: string }>)
-      .map((r) => ({ releaseId: r.releaseId, releaseDate: r.releaseDate }))
-      .filter((r) => new Date(r.releaseDate).getTime() <= cutoff)
-      .sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    const targetTs = new Date(`${year}-07-01T12:00:00Z`).getTime();
+    const sortedByCloseness = (releases as Array<{ releaseId: number; releaseDate: string }>)
+      .map((r) => ({ releaseId: r.releaseId, releaseDate: r.releaseDate, ts: new Date(r.releaseDate).getTime() }))
+      .sort((a, b) => Math.abs(a.ts - targetTs) - Math.abs(b.ts - targetTs));
 
-    const chosen = eligible[0] || null;
+    const chosen = sortedByCloseness[0] || null;
 
     const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 

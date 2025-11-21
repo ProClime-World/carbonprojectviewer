@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Polygon as PolygonType } from '@/lib/kmlParser';
 import { computePolygonAreaSqKm, km2ToHectares, formatAreaHa } from '@/lib/geo';
 
@@ -13,6 +13,7 @@ interface PolygonSidebarProps {
 export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: PolygonSidebarProps) {
   const [sortBy, setSortBy] = useState<'id' | 'name' | 'area'>('id');
   const [sortAsc, setSortAsc] = useState<boolean>(true);
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
   const rows = useMemo(() => {
     const base = polygons.map((p, idx) => {
@@ -46,6 +47,19 @@ export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: Po
     }
   };
 
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const visibleIndex = rows.findIndex(r => r.originalIndex === selectedIndex);
+    if (visibleIndex >= 0) {
+      const el = rowRefs.current[visibleIndex];
+      try {
+        el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        el?.scrollIntoView();
+      }
+    }
+  }, [selectedIndex, rows]);
+
   return (
     <div className="w-80 h-full border-r bg-white flex flex-col">
       <div className="p-4 border-b">
@@ -77,6 +91,7 @@ export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: Po
                   'cursor-pointer hover:bg-purple-50 ' +
                   (selectedIndex === row.originalIndex ? 'bg-purple-100' : '')
                 }
+                ref={el => rowRefs.current[idx] = el}
               >
                 <td className="px-3 py-2 text-gray-700">{row.id}</td>
                 <td className="px-3 py-2">
