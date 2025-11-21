@@ -109,7 +109,7 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
               url={tileTemplate}
               attribution="Sentinel-2 via Titiler"
               opacity={0.98}
-              crossOrigin={true as unknown as string}
+              crossOrigin={true}
             />
           )}
           <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#2d1b4e', weight: 2, fillOpacity: 0.2 }} />
