@@ -105,6 +105,29 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
     setMapKey(prev => prev + 1);
   }, [yearLeft, yearRight]);
 
+  // Memoize polygon components to prevent unnecessary re-renders
+  const polygonComponents = useMemo(() => 
+    polygons.map((polygon, idx) =>
+      polygon.coordinates.map((coords, coordIdx) => {
+        const isSelected = selectedIndex === idx;
+        return (
+          <Polygon
+            key={`${idx}-${coordIdx}`}
+            positions={coords.map(c => [c.lat, c.lng] as [number, number])}
+            pathOptions={{
+              color: isSelected ? '#f59e0b' : '#2d1b4e',
+              fillColor: isSelected ? '#f59e0b' : '#2d1b4e',
+              fillOpacity: isSelected ? 0.25 : 0.12,
+              weight: isSelected ? 3 : 2,
+            }}
+            eventHandlers={{
+              click: () => onSelectPolygon?.(idx),
+            }}
+          />
+        );
+      })
+    ), [polygons, selectedIndex, onSelectPolygon]);
+
   // Calculate bounding box from polygons or selected polygon using useMemo
   const boundingBox = useMemo((): [number, number, number, number] => {
     console.log('🗺️ Calculating bounding box for', polygons.length, 'polygons');
@@ -247,27 +270,8 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
           onError={() => setShowResolutionWarning(true)}
         />
 
-        {/* Polygons (Always on top of imagery) */}
-        {polygons.map((polygon, idx) =>
-          polygon.coordinates.map((coords, coordIdx) => {
-            const isSelected = selectedIndex === idx;
-            return (
-              <Polygon
-                key={`${idx}-${coordIdx}`}
-                positions={coords.map(c => [c.lat, c.lng] as [number, number])}
-                pathOptions={{
-                  color: isSelected ? '#f59e0b' : '#2d1b4e',
-                  fillColor: isSelected ? '#f59e0b' : '#2d1b4e',
-                  fillOpacity: isSelected ? 0.25 : 0.12,
-                  weight: isSelected ? 3 : 2,
-                }}
-                eventHandlers={{
-                  click: () => onSelectPolygon?.(idx),
-                }}
-              />
-            );
-          })
-        )}
+        {/* Polygons (Always on top of imagery) - Memoized to prevent unnecessary re-renders */}
+        {polygonComponents}
         <MapController polygons={polygons} selectedIndex={selectedIndex} />
       </MapContainer>
     </div>

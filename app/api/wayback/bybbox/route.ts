@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Cache for 1 hour to reduce external API calls
+export const revalidate = 3600;
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 function parseBbox(param: string | null): [number, number, number, number] | null {
   if (!param) return null;
@@ -36,7 +37,12 @@ export async function GET(req: Request) {
     // 2) Otherwise, use global releases list (from S3 config)
     if (!chosen) {
       const relUrl = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-      const r = await fetch(relUrl, { cache: 'no-store' });
+      const r = await fetch(relUrl, { 
+        next: { revalidate: 3600 }, // Cache for 1 hour
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'
+        }
+      });
       if (!r.ok) throw new Error('Wayback config fetch failed');
       
       const relData: Record<string, WaybackItem> = await r.json();
@@ -83,7 +89,9 @@ export async function GET(req: Request) {
 
     const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     if (!chosen) {
-      return NextResponse.json({ url: baseFallback, attribution: 'Esri World Imagery', releaseId: null, releaseDate: null });
+      const response = NextResponse.json({ url: baseFallback, attribution: 'Esri World Imagery', releaseId: null, releaseDate: null });
+      response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      return response;
     }
 
     // Use itemURL if available, otherwise construct it
@@ -98,12 +106,16 @@ export async function GET(req: Request) {
         urlTemplate = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${chosen.releaseId}/{z}/{y}/{x}`;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       url: urlTemplate,
       attribution: 'Esri Wayback Imagery',
       releaseId: chosen.releaseId,
       releaseDate: chosen.releaseDate,
     });
+    
+    // Add caching headers for better performance
+    response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    return response;
   } catch (e) {
     console.error(e);
     return new Response('Wayback lookup failed', { status: 502 });

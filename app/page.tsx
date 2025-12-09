@@ -86,7 +86,13 @@ export default function Home() {
         const filePath = `/data/${selectedProject}/${kmlFile}`;
         
         console.log(`📡 Fetching ${filePath}... (${i + 1}/${projectConfig.kmlFiles.length})`);
-        const response = await fetch(filePath);
+        // Use cache-first strategy for KML files (they don't change often)
+        const response = await fetch(filePath, {
+          cache: 'force-cache', // Use browser cache if available
+          headers: {
+            'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
+          }
+        });
         console.log(`📡 Response status for ${kmlFile}:`, response.status);
         
         if (response.ok) {

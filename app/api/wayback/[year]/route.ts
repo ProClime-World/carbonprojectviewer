@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
+// Cache the wayback config for 1 hour (3600 seconds)
+// This reduces external API calls significantly
+export const revalidate = 3600;
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 interface WaybackItem {
   itemID: string;
@@ -23,9 +25,15 @@ export async function GET(_req: Request) {
 
     // Prefer the release closest to mid-year so each year has a distinct slice
 
-    // Fetch Wayback config from S3
+    // Fetch Wayback config from S3 with caching
+    // Cache for 1 hour to reduce external API calls
     const apiUrl = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-    const resp = await fetch(apiUrl, { cache: 'no-store' });
+    const resp = await fetch(apiUrl, { 
+      next: { revalidate: 3600 }, // Cache for 1 hour
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'
+      }
+    });
     if (!resp.ok) {
       throw new Error(`Wayback config error: ${resp.status}`);
     }
@@ -48,12 +56,16 @@ export async function GET(_req: Request) {
             .replace('{row}', '{y}')
             .replace('{col}', '{x}');
             
-        return NextResponse.json({
+        const response = NextResponse.json({
           url: tileUrl,
           attribution: 'Esri Wayback Imagery',
           releaseId: rid,
           releaseDate: match ? match[1] : null,
         });
+        
+        // Add caching headers for better performance
+        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        return response;
       }
     }
 
@@ -84,12 +96,14 @@ export async function GET(_req: Request) {
     const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
     if (!chosen) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         url: baseFallback,
         attribution: 'Esri World Imagery',
         releaseId: null,
         releaseDate: null,
       });
+      response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      return response;
     }
 
     // Replace config placeholders with Leaflet placeholders
@@ -99,12 +113,16 @@ export async function GET(_req: Request) {
         .replace('{row}', '{y}')
         .replace('{col}', '{x}');
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       url: tileUrl,
       attribution: 'Esri Wayback Imagery',
       releaseId: chosen.releaseId,
       releaseDate: chosen.releaseDate,
     });
+    
+    // Add caching headers for better performance
+    response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    return response;
 
   } catch (err) {
     console.error('Wayback endpoint error:', err);
