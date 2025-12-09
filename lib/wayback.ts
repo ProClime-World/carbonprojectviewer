@@ -7,9 +7,9 @@ type YearToTileUrl = Record<number, string>;
 // If a year is not configured, we fall back to Esri World Imagery.
 // Pre-pin distinct Wayback releases for demo/consistency. Adjust as needed.
 const YEAR_TO_WAYBACK: YearToTileUrl = {
-  2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=157',
-  2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=268',
-  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=340',
+  2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/577/{z}/{y}/{x}',
+  2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/1049/{z}/{y}/{x}',
+  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/6543/{z}/{y}/{x}',
 };
 
 const DEFAULT_ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

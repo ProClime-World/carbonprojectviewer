@@ -10,6 +10,13 @@ function parseBbox(param: string | null): [number, number, number, number] | nul
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
+interface WaybackItem {
+  itemID: string;
+  itemTitle: string;
+  itemURL: string;
+  layerIdentifier: string;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -20,25 +27,38 @@ export async function GET(req: Request) {
     }
 
     // 1) If user pinned specific releases, use them
-    let chosen: { releaseId: number; releaseDate: string } | null = null;
+    let chosen: { releaseId: number; releaseDate: string; itemURL?: string } | null = null;
     const pinnedEnv = process.env.WAYBACK_PINNED ? safeParse(process.env.WAYBACK_PINNED) : null;
     if (pinnedEnv && typeof pinnedEnv[year] === 'number') {
       chosen = { releaseId: pinnedEnv[year], releaseDate: `${year}-01-01` };
     }
 
-    // 2) Otherwise, use global releases list (no token required)
+    // 2) Otherwise, use global releases list (from S3 config)
     if (!chosen) {
-      const relUrl = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/releases?f=pjson';
+      const relUrl = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
       const r = await fetch(relUrl, { cache: 'no-store' });
-      const relData = await r.json();
-      const releases: Array<{ releaseId: number; releaseDate: string }> = relData?.releases || [];
-      // Prefer releases within the target year; else closest to mid-year
-      const inYear = releases.filter((rr) => new Date(rr.releaseDate).getUTCFullYear() === year);
+      if (!r.ok) throw new Error('Wayback config fetch failed');
+      
+      const relData: Record<string, WaybackItem> = await r.json();
+      
+      const candidates = Object.keys(relData).map(key => {
+        const item = relData[key];
+        const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
+        if (!match) return null;
+        const dateStr = match[1];
+        const date = new Date(dateStr);
+        if (date.getUTCFullYear() !== year) return null;
+        return {
+            releaseId: parseInt(key, 10),
+            releaseDate: dateStr,
+            itemURL: item.itemURL,
+            ts: date.getTime()
+        };
+      }).filter((x): x is NonNullable<typeof x> => x !== null);
+
       const target = new Date(`${year}-07-01T12:00:00Z`).getTime();
-      const pool = (inYear.length > 0 ? inYear : releases)
-        .map((rr) => ({ ...rr, ts: new Date(rr.releaseDate).getTime() }))
-        .sort((a, b) => Math.abs(a.ts - target) - Math.abs(b.ts - target));
-      chosen = pool[0] || null;
+      const sorted = candidates.sort((a, b) => Math.abs(a.ts - target) - Math.abs(b.ts - target));
+      chosen = sorted[0] || null;
     }
 
     const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -46,7 +66,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ url: baseFallback, attribution: 'Esri World Imagery', releaseId: null, releaseDate: null });
     }
 
-    const urlTemplate = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=${chosen.releaseId}`;
+    // Use itemURL if available, otherwise construct it
+    let urlTemplate = '';
+    if (chosen.itemURL) {
+        urlTemplate = chosen.itemURL
+            .replace('{level}', '{z}')
+            .replace('{row}', '{y}')
+            .replace('{col}', '{x}');
+    } else {
+        // Fallback construction for pinned releases without fetched config
+        urlTemplate = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${chosen.releaseId}/{z}/{y}/{x}`;
+    }
+
     return NextResponse.json({
       url: urlTemplate,
       attribution: 'Esri Wayback Imagery',
@@ -54,6 +85,7 @@ export async function GET(req: Request) {
       releaseDate: chosen.releaseDate,
     });
   } catch (e) {
+    console.error(e);
     return new Response('Wayback lookup failed', { status: 502 });
   }
 }
@@ -61,4 +93,3 @@ export async function GET(req: Request) {
 function safeParse(json: string): Record<string, number> | null {
   try { return JSON.parse(json); } catch { return null; }
 }
-

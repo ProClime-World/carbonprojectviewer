@@ -70,14 +70,14 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
     try { localStorage.setItem('wayback.releaseIds', JSON.stringify(map)); } catch {}
   }
   function defaultRelease(y: number): number {
-    const defaults: Record<number, number> = { 2017: 157, 2021: 268, 2025: 340 };
-    return defaults[y] || 268;
+    const defaults: Record<number, number> = { 2017: 577, 2021: 1049, 2025: 6543 };
+    return defaults[y] || 1049;
   }
 
   React.useEffect(() => {
     const pinned = getPinned();
     const releaseId = pinned[year] || defaultRelease(year);
-    const url = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=${releaseId}&cb=${releaseId}`;
+    const url = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${releaseId}/{z}/{y}/{x}`;
     setTileTemplate(url);
     setMeta(`Esri Wayback Imagery • Release ${releaseId}`);
   }, [year]);
@@ -92,7 +92,7 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
             const pinned = getPinned();
             pinned[year] = rid;
             setPinned(pinned);
-            const url = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?releaseId=${rid}&cb=${rid}`;
+            const url = `https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/${rid}/{z}/{y}/{x}`;
             setTileTemplate(url);
             setMeta(`Esri Wayback Imagery • Release ${rid}`);
           }} />
