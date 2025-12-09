@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinate } from '@/lib/kmlParser';
 import WaybackLayer from './WaybackLayer';
+import L from 'leaflet';
 
 // Fix for default marker icons in react-leaflet
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl as unknown as undefined;
