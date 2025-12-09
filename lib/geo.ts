@@ -5,27 +5,28 @@ export interface LatLng {
   lng: number;
 }
 
-// Project lat/lng to Web Mercator (EPSG:3857) in meters
-function projectWebMercator(coord: LatLng): { x: number; y: number } {
-  const R = 6378137; // meters
-  const x = (coord.lng * Math.PI * R) / 180;
-  const y =
-    Math.log(Math.tan(Math.PI / 4 + (coord.lat * Math.PI) / 360)) * R;
-  return { x, y };
+// Helper to convert degrees to radians
+function toRad(degrees: number): number {
+  return (degrees * Math.PI) / 180;
 }
 
-// Compute polygon area using the shoelace formula on projected coords (m^2)
+// Compute geodesic polygon area on a sphere (meters^2)
 export function computePolygonAreaSqKm(coords: LatLng[]): number {
   if (!coords || coords.length < 3) return 0;
-  const projected = coords.map(projectWebMercator);
-  let sum = 0;
-  for (let i = 0; i < projected.length; i++) {
-    const a = projected[i];
-    const b = projected[(i + 1) % projected.length];
-    sum += a.x * b.y - b.x * a.y;
+  
+  const R = 6378137; // Earth radius in meters
+  let area = 0;
+
+  for (let i = 0; i < coords.length; i++) {
+    const p1 = coords[i];
+    const p2 = coords[(i + 1) % coords.length];
+    
+    // Formula for area on a sphere
+    area += toRad(p2.lng - p1.lng) * (2 + Math.sin(toRad(p1.lat)) + Math.sin(toRad(p2.lat)));
   }
-  const areaM2 = Math.abs(sum) / 2;
-  return areaM2 / 1_000_000; // convert to km^2
+  
+  area = (area * R * R) / 2.0;
+  return Math.abs(area) / 1_000_000; // convert to km^2
 }
 
 export function formatAreaKm2(areaKm2: number): string {
@@ -44,6 +45,3 @@ export function formatAreaHa(areaHa: number): string {
   if (areaHa >= 10) return `${areaHa.toFixed(1)} ha`;
   return `${areaHa.toFixed(2)} ha`;
 }
-
-
-

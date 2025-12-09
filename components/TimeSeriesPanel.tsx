@@ -71,9 +71,8 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
   }
   function defaultRelease(y: number): number {
     // 2017: 4073 (2017-06-27)
-    // 2021: 13534 (2021-06-30)
     // 2024: 16453 (2024-12-12)
-    const defaults: Record<number, number> = { 2017: 4073, 2021: 13534, 2024: 16453 };
+    const defaults: Record<number, number> = { 2017: 4073, 2024: 16453 };
     return defaults[y] || 16453;
   }
 
@@ -116,6 +115,7 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
               opacity={0.98}
               crossOrigin={true}
               maxZoom={19}
+              maxNativeZoom={17}
             />
           )}
           <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#2d1b4e', weight: 2, fillOpacity: 0.2 }} />

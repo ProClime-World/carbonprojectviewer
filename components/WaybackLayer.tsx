@@ -4,13 +4,17 @@ import { useEffect, useState } from 'react';
 import { TileLayer } from 'react-leaflet';
 import { fetchWaybackForYear } from '@/lib/wayback';
 
+import { TileLayer as LeafletTileLayer } from 'leaflet';
+
 interface WaybackLayerProps {
   year: number;
   onInfoLoaded?: (info: { releaseDate: string | null; releaseId: number | null }) => void;
   onError?: () => void;
+  onLayerReady?: (layer: LeafletTileLayer) => void;
+  className?: string;
 }
 
-export default function WaybackLayer({ year, onInfoLoaded, onError }: WaybackLayerProps) {
+export default function WaybackLayer({ year, onInfoLoaded, onError, onLayerReady, className }: WaybackLayerProps) {
   const [tileUrl, setTileUrl] = useState<string | null>(null);
   const [attribution, setAttribution] = useState<string>('Esri Wayback Imagery');
 
@@ -46,7 +50,15 @@ export default function WaybackLayer({ year, onInfoLoaded, onError }: WaybackLay
 
   return (
     <TileLayer
+      ref={(node) => {
+          if (node && onLayerReady) {
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-ignore - react-leaflet types are tricky
+              onLayerReady(node);
+          }
+      }}
       url={tileUrl}
+      className={className}
       attribution={attribution}
       maxZoom={19}
       maxNativeZoom={17}

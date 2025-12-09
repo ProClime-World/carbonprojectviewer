@@ -17,7 +17,8 @@ L.Icon.Default.mergeOptions({
 
 interface MapViewProps {
   polygons: { coordinates: Coordinate[][] }[];
-  selectedYear: number;
+  yearLeft?: number;
+  yearRight?: number;
   selectedIndex?: number | null;
   onSelectPolygon?: (index: number) => void;
 }
@@ -43,21 +44,66 @@ function MapController({ polygons, selectedIndex }: { polygons: { coordinates: C
   return null;
 }
 
-export default function MapView({ polygons, selectedYear, selectedIndex = null, onSelectPolygon }: MapViewProps) {
+export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, selectedIndex = null, onSelectPolygon }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0); // Force map re-render
-  const [waybackInfo, setWaybackInfo] = useState<{ releaseDate: string | null; releaseId: number | null }>({ releaseDate: null, releaseId: null });
+  const [leftInfo, setLeftInfo] = useState<{ releaseDate: string | null; releaseId: number | null }>({ releaseDate: null, releaseId: null });
+  const [rightInfo, setRightInfo] = useState<{ releaseDate: string | null; releaseId: number | null }>({ releaseDate: null, releaseId: null });
   const [showResolutionWarning, setShowResolutionWarning] = useState(false);
+  
+  const [sliderPosition, setSliderPosition] = useState(50);
+  const [rightLayer, setRightLayer] = useState<L.TileLayer | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Log year changes and force map update
+  // Update clipping when slider or right layer changes
   useEffect(() => {
-    console.log(`📅 Year changed to: ${selectedYear}`);
-    setMapKey(prev => prev + 1); // Force map re-render
-  }, [selectedYear]);
+    if (!rightLayer) return;
+    
+    const container = rightLayer.getContainer();
+    if (!container) return;
+
+    // Clip the right layer (which is on top) to reveal the left layer
+    // We clip the left side of the right layer
+    // rect(top, right, bottom, left)
+    // We want to show the right layer from X% to 100%
+    // So we clip from 0 to X% (hide left part)
+    // Standard Leaflet SideBySide uses getRangeInput().value to set clip
+    // CSS clip: rect(0, 9999px, 9999px, {position}px)
+    
+    const updateClip = () => {
+        const rect = mapInstance?.getContainer().getBoundingClientRect();
+        if (!rect) return;
+        
+        const width = rect.width;
+        const clipX = (width * sliderPosition) / 100;
+        
+        // Clip the left part of the right layer
+        container.style.clip = `rect(0, 9999px, 9999px, ${clipX}px)`;
+    };
+    
+    updateClip();
+    
+    // We also need to update on map move because the layer container might shift? 
+    // Actually L.TileLayer container usually stays fixed relative to map pane, but let's see.
+    // In Leaflet 1.x, the tile container moves with the map.
+    // The "leaflet-side-by-side" plugin updates clip on 'move' event.
+    
+    mapInstance?.on('move', updateClip);
+    return () => {
+        mapInstance?.off('move', updateClip);
+    };
+  }, [sliderPosition, rightLayer]); // mapInstance added below
+
+  // We need access to the map instance for dimensions
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  // Log year changes and force map update (if years change dynamically, though fixed for now)
+  useEffect(() => {
+    setMapKey(prev => prev + 1);
+  }, [yearLeft, yearRight]);
 
   // Calculate bounding box from polygons or selected polygon using useMemo
   const boundingBox = useMemo((): [number, number, number, number] => {
@@ -102,9 +148,12 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
     }
   }, [polygons, selectedIndex]);
 
-  const handleWaybackLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
-    setWaybackInfo(info);
-    console.log(`✅ Wayback loaded: Release ${info.releaseId} (${info.releaseDate})`);
+  const handleLeftLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
+    setLeftInfo(info);
+  };
+
+  const handleRightLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
+    setRightInfo(info);
   };
 
   if (!isMounted) {
@@ -118,18 +167,43 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
   // Attribution handled inside layers
 
   return (
-    <div className="relative w-full h-full">
-      {/* Year info */}
-      <div className="absolute top-4 left-4 z-10 bg-white bg-opacity-90 px-3 py-2 rounded-md shadow-md">
-        <div className="text-sm text-gray-700">
-          <div className="font-medium">Wayback Imagery {selectedYear}</div>
-          <div className="text-xs text-gray-500">
-            {waybackInfo.releaseId
-              ? `Release ${waybackInfo.releaseId} • ${waybackInfo.releaseDate || 'Unknown Date'}`
-              : 'Loading satellite data...'
-            }
-          </div>
+    <div className="relative w-full h-full group">
+      {/* Split Screen Slider Control */}
+      <div className="absolute inset-0 z-[401] pointer-events-none flex items-center justify-center">
+        {/* Slider Line */}
+        <div 
+            className="absolute top-0 bottom-0 w-1 bg-white shadow-md pointer-events-auto cursor-ew-resize hover:bg-gray-100 transition-colors"
+            style={{ left: `${sliderPosition}%` }}
+        >
+             {/* Handle */}
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200">
+                <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
+                </svg>
+             </div>
         </div>
+        
+        {/* Invisible Range Input for Interaction */}
+        <input
+            type="range"
+            min="0"
+            max="100"
+            value={sliderPosition}
+            onChange={(e) => setSliderPosition(Number(e.target.value))}
+            className="absolute inset-0 w-full h-full opacity-0 pointer-events-auto cursor-ew-resize"
+            style={{ margin: 0 }}
+        />
+      </div>
+
+      {/* Year Labels */}
+      <div className="absolute top-4 left-4 z-[402] bg-white/90 px-3 py-2 rounded-md shadow-md pointer-events-none border-l-4 border-blue-500">
+        <div className="text-sm font-bold text-gray-800">{yearLeft}</div>
+        <div className="text-xs text-gray-600">{leftInfo.releaseDate || 'Loading...'}</div>
+      </div>
+      
+      <div className="absolute top-4 right-4 z-[402] bg-white/90 px-3 py-2 rounded-md shadow-md pointer-events-none border-r-4 border-purple-500 text-right">
+        <div className="text-sm font-bold text-gray-800">{yearRight}</div>
+        <div className="text-xs text-gray-600">{rightInfo.releaseDate || 'Loading...'}</div>
       </div>
 
       {/* Resolution warning notification */}
@@ -148,31 +222,32 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
       )}
 
       <MapContainer
-        key={mapKey} // Force re-render when year changes
+        key={mapKey}
         center={[0, 0]}
         zoom={2}
         minZoom={2}
         maxZoom={18}
         style={{ height: '100%', width: '100%' }}
         className="z-0"
+        ref={setMapInstance}
       >
-        {/* Only show base map if Wayback is not loaded yet or fails */}
-        {!waybackInfo.releaseId && (
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution="Esri World Imagery"
-            maxZoom={19}
-          />
-        )}
+        {/* Left Layer (Bottom) */}
         <WaybackLayer
-          year={selectedYear}
-          onInfoLoaded={handleWaybackLoaded}
-          onError={() => {
-            setShowResolutionWarning(true);
-            // Hide the warning after 4 seconds
-            setTimeout(() => setShowResolutionWarning(false), 4000);
-          }}
+          year={yearLeft}
+          onInfoLoaded={handleLeftLoaded}
+          onError={() => setShowResolutionWarning(true)}
         />
+        
+        {/* Right Layer (Top, clipped) */}
+        <WaybackLayer
+          year={yearRight}
+          onInfoLoaded={handleRightLoaded}
+          onLayerReady={setRightLayer}
+          className="z-[200]" // Ensure it's on top if using standard panes
+          onError={() => setShowResolutionWarning(true)}
+        />
+
+        {/* Polygons (Always on top of imagery) */}
         {polygons.map((polygon, idx) =>
           polygon.coordinates.map((coords, coordIdx) => {
             const isSelected = selectedIndex === idx;

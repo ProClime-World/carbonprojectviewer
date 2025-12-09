@@ -21,7 +21,7 @@ const TimeSeriesPanel = dynamic(() => import('@/components/TimeSeriesPanel'), {
   ssr: false,
 });
 
-const YEARS = [2017, 2021, 2024];
+const YEARS = [2017, 2024];
 
 type Project = 'RRISL' | 'ECM';
 
@@ -206,31 +206,8 @@ export default function Home() {
             />
           </div>
 
-          {/* Year Selector */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Satellite Imagery Year:</label>
-            <div className="flex gap-2">
-              {YEARS.map((year) => (
-                <button
-                  key={year}
-                  onClick={() => {
-                    console.log(`🔘 Year button clicked: ${year}`);
-                    setIsChangingYear(true);
-                    setSelectedYear(year);
-                    // Reset the changing indicator after a short delay
-                    setTimeout(() => setIsChangingYear(false), 1000);
-                  }}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    selectedYear === year
-                      ? 'bg-[#2d1b4e] text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Year Selector - REMOVED for Split Screen */}
+          {/* <div className="flex items-center gap-2">...</div> */}
 
           {/* Polygon Count */}
           {polygons.length > 0 && (
@@ -338,7 +315,8 @@ export default function Home() {
         ) : (
           <MapView
             polygons={polygons}
-            selectedYear={selectedYear}
+            yearLeft={2017}
+            yearRight={2024}
             selectedIndex={selectedPolygonIndex}
             onSelectPolygon={(idx) => setSelectedPolygonIndex(idx)}
           />
@@ -354,7 +332,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-gray-100 border-t p-3 text-center text-sm text-gray-600">
         <div className="flex justify-center items-center gap-4">
-          <span>Satellite imagery for {selectedYear}</span>
+          <span>Comparing 2017 vs 2024</span>
           <span>•</span>
           <span>{polygons.length} project area{polygons.length !== 1 ? 's' : ''}</span>
           <span>•</span>
