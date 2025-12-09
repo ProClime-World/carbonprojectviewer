@@ -4,9 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinate } from '@/lib/kmlParser';
-import { SentinelItem } from '@/lib/sentinelMosaic';
-import SentinelMosaicLayer from './SentinelMosaicLayer';
-import L from 'leaflet';
+import WaybackLayer from './WaybackLayer';
 
 // Fix for default marker icons in react-leaflet
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl as unknown as undefined;
@@ -47,8 +45,7 @@ function MapController({ polygons, selectedIndex }: { polygons: { coordinates: C
 export default function MapView({ polygons, selectedYear, selectedIndex = null, onSelectPolygon }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0); // Force map re-render
-  const [mosaicItems, setMosaicItems] = useState<SentinelItem[]>([]);
-  const [isLoadingMosaic] = useState(false);
+  const [waybackInfo, setWaybackInfo] = useState<{ releaseDate: string | null; releaseId: number | null }>({ releaseDate: null, releaseId: null });
 
   useEffect(() => {
     setIsMounted(true);
@@ -103,9 +100,9 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
     }
   }, [polygons, selectedIndex]);
 
-  const handleMosaicLoaded = (items: SentinelItem[]) => {
-    setMosaicItems(items);
-    console.log(`✅ Mosaic loaded: ${items.length} Sentinel-2 scenes for ${selectedYear}`);
+  const handleWaybackLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
+    setWaybackInfo(info);
+    console.log(`✅ Wayback loaded: Release ${info.releaseId} (${info.releaseDate})`);
   };
 
   if (!isMounted) {
@@ -123,25 +120,15 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
       {/* Year info */}
       <div className="absolute top-4 left-4 z-10 bg-white bg-opacity-90 px-3 py-2 rounded-md shadow-md">
         <div className="text-sm text-gray-700">
-          <div className="font-medium">Sentinel-2 {selectedYear} Mosaic</div>
+          <div className="font-medium">Wayback Imagery {selectedYear}</div>
           <div className="text-xs text-gray-500">
-            {mosaicItems.length > 0 
-              ? `${mosaicItems.length} scenes • ESA/Copernicus`
+            {waybackInfo.releaseId
+              ? `Release ${waybackInfo.releaseId} • ${waybackInfo.releaseDate || 'Unknown Date'}`
               : 'Loading satellite data...'
             }
           </div>
         </div>
       </div>
-
-      {/* Loading indicator */}
-      {isLoadingMosaic && (
-        <div className="absolute top-4 right-4 z-10 bg-blue-500 text-white px-3 py-2 rounded-md shadow-lg">
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span className="text-sm">Generating {selectedYear} mosaic...</span>
-          </div>
-        </div>
-      )}
 
       <MapContainer
         key={mapKey} // Force re-render when year changes
@@ -158,10 +145,9 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
           attribution="Esri World Imagery"
           maxZoom={19}
         />
-        <SentinelMosaicLayer
+        <WaybackLayer
           year={selectedYear}
-          bbox={boundingBox}
-          onMosaicLoaded={handleMosaicLoaded}
+          onInfoLoaded={handleWaybackLoaded}
         />
         {polygons.map((polygon, idx) =>
           polygon.coordinates.map((coords, coordIdx) => {
