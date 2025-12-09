@@ -11,8 +11,8 @@ const YEAR_TO_WAYBACK: YearToTileUrl = {
   2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/4073/{z}/{y}/{x}',
   // 2021-06-30 (Release 13534) - Mid-year
   2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/13534/{z}/{y}/{x}',
-  // 2025-06-26 (Release 48925) - Mid-year
-  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/48925/{z}/{y}/{x}',
+  // 2024-12-12 (Release 16453) - December
+  2024: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/16453/{z}/{y}/{x}',
 };
 
 const DEFAULT_ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

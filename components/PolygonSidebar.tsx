@@ -8,9 +8,10 @@ interface PolygonSidebarProps {
   polygons: PolygonType[];
   selectedIndex: number | null;
   onSelect: (index: number) => void;
+  totalAreaHa: number;
 }
 
-export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: PolygonSidebarProps) {
+export default function PolygonSidebar({ polygons, selectedIndex, onSelect, totalAreaHa }: PolygonSidebarProps) {
   const [sortBy, setSortBy] = useState<'id' | 'name' | 'area'>('id');
   const [sortAsc, setSortAsc] = useState<boolean>(true);
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
@@ -64,7 +65,9 @@ export default function PolygonSidebar({ polygons, selectedIndex, onSelect }: Po
     <div className="w-80 h-full border-r bg-white flex flex-col">
       <div className="p-4 border-b">
         <div className="text-lg font-semibold text-gray-800">Project Areas</div>
-        <div className="text-xs text-gray-500">{rows.length} polygons</div>
+        <div className="text-xs text-gray-500">
+          {rows.length} polygons • {formatAreaHa(totalAreaHa)}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">

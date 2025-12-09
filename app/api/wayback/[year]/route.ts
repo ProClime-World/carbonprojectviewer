@@ -35,7 +35,7 @@ export async function GET(_req: Request) {
     const PREFERRED_RELEASES: Record<number, number> = {
       2017: 4073,  // 2017-06-27
       2021: 13534, // 2021-06-30
-      2025: 48925  // 2025-06-26
+      2024: 16453  // 2024-12-12
     };
 
     if (PREFERRED_RELEASES[year]) {

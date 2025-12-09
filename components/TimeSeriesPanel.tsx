@@ -72,9 +72,9 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
   function defaultRelease(y: number): number {
     // 2017: 4073 (2017-06-27)
     // 2021: 13534 (2021-06-30)
-    // 2025: 48925 (2025-06-26)
-    const defaults: Record<number, number> = { 2017: 4073, 2021: 13534, 2025: 48925 };
-    return defaults[y] || 13534;
+    // 2024: 16453 (2024-12-12)
+    const defaults: Record<number, number> = { 2017: 4073, 2021: 13534, 2024: 16453 };
+    return defaults[y] || 16453;
   }
 
   React.useEffect(() => {

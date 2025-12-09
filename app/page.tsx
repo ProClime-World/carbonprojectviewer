@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import PolygonSidebar from '@/components/PolygonSidebar';
 import { parseKML, Polygon, ParseProgress } from '@/lib/kmlParser';
+import { computePolygonAreaSqKm, km2ToHectares, formatAreaHa } from '@/lib/geo';
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import('@/components/MapView'), {
@@ -20,7 +21,7 @@ const TimeSeriesPanel = dynamic(() => import('@/components/TimeSeriesPanel'), {
   ssr: false,
 });
 
-const YEARS = [2017, 2021, 2025];
+const YEARS = [2017, 2021, 2024];
 
 type Project = 'RRISL' | 'ECM';
 
@@ -53,6 +54,14 @@ export default function Home() {
   const [parseProgress, setParseProgress] = useState<ParseProgress | null>(null);
   const [fileSize, setFileSize] = useState<number>(0);
   const [isChangingYear, setIsChangingYear] = useState(false);
+
+  const totalAreaHa = useMemo(() => {
+    return polygons.reduce((acc, p) => {
+      const firstRing = p.coordinates[0] || [];
+      const areaKm2 = computePolygonAreaSqKm(firstRing.map(c => ({ lat: c.lat, lng: c.lng })));
+      return acc + km2ToHectares(areaKm2);
+    }, 0);
+  }, [polygons]);
 
   useEffect(() => {
     // Automatically load the KML file(s) when project changes
@@ -275,6 +284,7 @@ export default function Home() {
           polygons={polygons}
           selectedIndex={selectedPolygonIndex}
           onSelect={(idx) => setSelectedPolygonIndex(idx)}
+          totalAreaHa={totalAreaHa}
         />
 
         {/* Map center */}
@@ -347,7 +357,9 @@ export default function Home() {
           <span>Satellite imagery for {selectedYear}</span>
           <span>•</span>
           <span>{polygons.length} project area{polygons.length !== 1 ? 's' : ''}</span>
-          <span className="text-blue-600">• Sentinel-2 Mosaic</span>
+          <span>•</span>
+          <span>{formatAreaHa(totalAreaHa)}</span>
+          <span className="text-blue-600">• Wayback Imagery</span>
         </div>
       </footer>
     </div>
