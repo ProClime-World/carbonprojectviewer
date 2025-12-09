@@ -31,6 +31,32 @@ export async function GET(_req: Request) {
     }
     const data: Record<string, WaybackItem> = await resp.json();
 
+    // Hardcode specific release preferences for consistency
+    const PREFERRED_RELEASES: Record<number, number> = {
+      2017: 4073,  // 2017-06-27
+      2021: 13534, // 2021-06-30
+      2025: 48925  // 2025-06-26
+    };
+
+    if (PREFERRED_RELEASES[year]) {
+      const rid = PREFERRED_RELEASES[year];
+      const item = data[rid.toString()];
+      if (item) {
+        const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
+        const tileUrl = item.itemURL
+            .replace('{level}', '{z}')
+            .replace('{row}', '{y}')
+            .replace('{col}', '{x}');
+            
+        return NextResponse.json({
+          url: tileUrl,
+          attribution: 'Esri Wayback Imagery',
+          releaseId: rid,
+          releaseDate: match ? match[1] : null,
+        });
+      }
+    }
+
     const targetTs = new Date(`${year}-07-01T12:00:00Z`).getTime();
     
     const candidates = Object.keys(data).map(key => {

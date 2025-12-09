@@ -41,24 +41,44 @@ export async function GET(req: Request) {
       
       const relData: Record<string, WaybackItem> = await r.json();
       
-      const candidates = Object.keys(relData).map(key => {
-        const item = relData[key];
-        const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
-        if (!match) return null;
-        const dateStr = match[1];
-        const date = new Date(dateStr);
-        if (date.getUTCFullYear() !== year) return null;
-        return {
-            releaseId: parseInt(key, 10),
-            releaseDate: dateStr,
-            itemURL: item.itemURL,
-            ts: date.getTime()
-        };
-      }).filter((x): x is NonNullable<typeof x> => x !== null);
+      // Hardcode specific release preferences for consistency if not pinned
+      const PREFERRED_RELEASES: Record<number, number> = {
+        2017: 4073,  // 2017-06-27
+        2021: 13534, // 2021-06-30
+        2025: 48925  // 2025-06-26
+      };
 
-      const target = new Date(`${year}-07-01T12:00:00Z`).getTime();
-      const sorted = candidates.sort((a, b) => Math.abs(a.ts - target) - Math.abs(b.ts - target));
-      chosen = sorted[0] || null;
+      if (PREFERRED_RELEASES[year] && relData[PREFERRED_RELEASES[year].toString()]) {
+         const rid = PREFERRED_RELEASES[year];
+         const item = relData[rid];
+         const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
+         chosen = {
+             releaseId: rid,
+             releaseDate: match ? match[1] : `${year}-06-30`,
+             itemURL: item.itemURL,
+             // @ts-expect-error - temp prop
+             ts: 0
+         };
+      } else {
+          const candidates = Object.keys(relData).map(key => {
+            const item = relData[key];
+            const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
+            if (!match) return null;
+            const dateStr = match[1];
+            const date = new Date(dateStr);
+            if (date.getUTCFullYear() !== year) return null;
+            return {
+                releaseId: parseInt(key, 10),
+                releaseDate: dateStr,
+                itemURL: item.itemURL,
+                ts: date.getTime()
+            };
+          }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+          const target = new Date(`${year}-07-01T12:00:00Z`).getTime();
+          const sorted = candidates.sort((a, b) => Math.abs(a.ts - target) - Math.abs(b.ts - target));
+          chosen = sorted[0] || null;
+      }
     }
 
     const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

@@ -7,9 +7,12 @@ type YearToTileUrl = Record<number, string>;
 // If a year is not configured, we fall back to Esri World Imagery.
 // Pre-pin distinct Wayback releases for demo/consistency. Adjust as needed.
 const YEAR_TO_WAYBACK: YearToTileUrl = {
-  2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/577/{z}/{y}/{x}',
-  2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/1049/{z}/{y}/{x}',
-  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/6543/{z}/{y}/{x}',
+  // 2017-06-27 (Release 4073) - Mid-year
+  2017: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/4073/{z}/{y}/{x}',
+  // 2021-06-30 (Release 13534) - Mid-year
+  2021: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/13534/{z}/{y}/{x}',
+  // 2025-06-26 (Release 48925) - Mid-year
+  2025: 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/48925/{z}/{y}/{x}',
 };
 
 const DEFAULT_ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

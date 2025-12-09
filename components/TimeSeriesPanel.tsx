@@ -70,8 +70,11 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
     try { localStorage.setItem('wayback.releaseIds', JSON.stringify(map)); } catch {}
   }
   function defaultRelease(y: number): number {
-    const defaults: Record<number, number> = { 2017: 577, 2021: 1049, 2025: 6543 };
-    return defaults[y] || 1049;
+    // 2017: 4073 (2017-06-27)
+    // 2021: 13534 (2021-06-30)
+    // 2025: 48925 (2025-06-26)
+    const defaults: Record<number, number> = { 2017: 4073, 2021: 13534, 2025: 48925 };
+    return defaults[y] || 13534;
   }
 
   React.useEffect(() => {
@@ -100,8 +103,10 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
       </div>
       <div className="h-48">
         <MapContainer center={coords[0]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false} attributionControl={false}>
-          {/* Basemap underneath as a safety net */}
-          <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+          {/* Only show basemap if no tile template (which shouldn't happen) */}
+          {!tileTemplate && (
+             <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+          )}
           {/* Year-specific Sentinel-2 visual overlay */}
           {tileTemplate && (
             <TileLayer
@@ -110,6 +115,7 @@ function CardForYear({ year, coords, highlight }: { year: number; coords: [numbe
               attribution="Sentinel-2 via Titiler"
               opacity={0.98}
               crossOrigin={true}
+              maxZoom={19}
             />
           )}
           <Polygon positions={coords} pathOptions={{ color: highlight ? '#f59e0b' : '#2d1b4e', weight: 2, fillOpacity: 0.2 }} />

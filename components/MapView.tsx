@@ -47,6 +47,7 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0); // Force map re-render
   const [waybackInfo, setWaybackInfo] = useState<{ releaseDate: string | null; releaseId: number | null }>({ releaseDate: null, releaseId: null });
+  const [showResolutionWarning, setShowResolutionWarning] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -131,6 +132,21 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
         </div>
       </div>
 
+      {/* Resolution warning notification */}
+      {showResolutionWarning && (
+        <div className="absolute top-4 right-4 z-20 bg-amber-100 border border-amber-300 text-amber-800 px-3 py-2 rounded-md shadow-lg transition-opacity duration-300">
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium">Imagery missing at this zoom level</span>
+          </div>
+          <div className="text-xs text-amber-700 mt-1 pl-7">
+            Try zooming out to see the imagery.
+          </div>
+        </div>
+      )}
+
       <MapContainer
         key={mapKey} // Force re-render when year changes
         center={[0, 0]}
@@ -140,15 +156,22 @@ export default function MapView({ polygons, selectedYear, selectedIndex = null, 
         style={{ height: '100%', width: '100%' }}
         className="z-0"
       >
-        {/* Base map imagery */}
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          attribution="Esri World Imagery"
-          maxZoom={19}
-        />
+        {/* Only show base map if Wayback is not loaded yet or fails */}
+        {!waybackInfo.releaseId && (
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            attribution="Esri World Imagery"
+            maxZoom={19}
+          />
+        )}
         <WaybackLayer
           year={selectedYear}
           onInfoLoaded={handleWaybackLoaded}
+          onError={() => {
+            setShowResolutionWarning(true);
+            // Hide the warning after 4 seconds
+            setTimeout(() => setShowResolutionWarning(false), 4000);
+          }}
         />
         {polygons.map((polygon, idx) =>
           polygon.coordinates.map((coords, coordIdx) => {
