@@ -124,20 +124,29 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
         return [-180, -90, 180, 90]; // Global fallback
       }
       
-      const lats = allCoords.map(c => c.lat).filter(lat => !isNaN(lat));
-      const lngs = allCoords.map(c => c.lng).filter(lng => !isNaN(lng));
+      // Use iterative min/max to avoid spreading very large arrays (stack overflow)
+      let west = Infinity;
+      let south = Infinity;
+      let east = -Infinity;
+      let north = -Infinity;
+      let validCount = 0;
+
+      for (const c of allCoords) {
+        const { lat, lng } = c;
+        if (isNaN(lat) || isNaN(lng)) continue;
+        validCount += 1;
+        if (lng < west) west = lng;
+        if (lat < south) south = lat;
+        if (lng > east) east = lng;
+        if (lat > north) north = lat;
+      }
       
-      if (lats.length === 0 || lngs.length === 0) {
+      if (validCount === 0) {
         console.log('🗺️ Invalid coordinates, using global fallback');
         return [-180, -90, 180, 90]; // Global fallback
       }
       
-      const bbox: [number, number, number, number] = [
-        Math.min(...lngs), // west
-        Math.min(...lats), // south
-        Math.max(...lngs), // east
-        Math.max(...lats)  // north
-      ];
+      const bbox: [number, number, number, number] = [west, south, east, north];
       
       console.log('🗺️ Calculated bounding box:', bbox);
       return bbox;
