@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import PolygonSidebar from '@/components/PolygonSidebar';
 import { parseKML, Polygon, ParseProgress } from '@/lib/kmlParser';
 import { computePolygonAreaSqKm, km2ToHectares, formatAreaHa } from '@/lib/geo';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import('@/components/MapView'), {
@@ -108,7 +109,7 @@ export default function Home() {
           console.log(`📄 KML content length for ${kmlFile}:`, kmlContent.length);
           
           console.log(`🔍 Starting KML parsing for ${kmlFile}...`);
-          const parsedPolygons = parseKML(kmlContent, (progress) => {
+          const parsedPolygons = await parseKML(kmlContent, (progress) => {
             console.log(`📊 Parse progress for ${kmlFile}:`, progress);
             // Update progress to show which file is being processed
             setParseProgress({
@@ -156,7 +157,7 @@ export default function Home() {
     
     try {
       const text = await file.text();
-      const parsedPolygons = parseKML(text, (progress) => {
+      const parsedPolygons = await parseKML(text, (progress) => {
         setParseProgress(progress);
       });
       setPolygons(parsedPolygons);
@@ -169,7 +170,8 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
+    <ErrorBoundary>
+      <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="bg-[#2d1b4e] text-white p-4 shadow-lg">
         <h1 className="text-2xl font-bold">Carbon Project Viewer</h1>
@@ -347,5 +349,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
+    </ErrorBoundary>
   );
 }

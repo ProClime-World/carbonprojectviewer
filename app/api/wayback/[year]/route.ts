@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 // Cache the wayback config for 1 hour (3600 seconds)
 // This reduces external API calls significantly
 export const revalidate = 3600;
 export const dynamic = 'force-dynamic';
+
+// Maximum execution time for this route (Vercel Pro: 60s for Hobby, 300s for Pro)
+export const maxDuration = 10; // 10 seconds max
 
 interface WaybackItem {
   itemID: string;
@@ -25,10 +29,12 @@ export async function GET(_req: Request) {
 
     // Prefer the release closest to mid-year so each year has a distinct slice
 
-    // Fetch Wayback config from S3 with caching
+    // Fetch Wayback config from S3 with caching and timeout
     // Cache for 1 hour to reduce external API calls
     const apiUrl = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-    const resp = await fetch(apiUrl, { 
+    const resp = await fetchWithTimeout(apiUrl, { 
+      timeout: 5000, // 5 second timeout
+      retries: 2, // Retry twice on failure
       next: { revalidate: 3600 }, // Cache for 1 hour
       headers: {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'
@@ -126,6 +132,17 @@ export async function GET(_req: Request) {
 
   } catch (err) {
     console.error('Wayback endpoint error:', err);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    
+    // Return fallback response instead of error to prevent app crashes
+    const fallbackUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const response = NextResponse.json({
+      url: fallbackUrl,
+      attribution: 'Esri World Imagery (Fallback)',
+      releaseId: null,
+      releaseDate: null,
+    }, { status: 200 }); // Return 200 with fallback instead of 500
+    
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    return response;
   }
 }

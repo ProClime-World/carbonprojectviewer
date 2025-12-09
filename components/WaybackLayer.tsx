@@ -20,11 +20,20 @@ export default function WaybackLayer({ year, onInfoLoaded, onError, onLayerReady
 
   useEffect(() => {
     let active = true;
+    let timeoutId: NodeJS.Timeout | null = null;
 
     async function load() {
       try {
-        const data = await fetchWaybackForYear(year);
-        if (active) {
+        // Add timeout to prevent hanging
+        const loadPromise = fetchWaybackForYear(year);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Wayback load timeout')), 10000); // 10 second timeout
+        });
+
+        const data = await Promise.race([loadPromise, timeoutPromise]);
+        
+        if (active && timeoutId) {
+          clearTimeout(timeoutId);
           setTileUrl(data.url);
           setAttribution(data.attribution);
           if (onInfoLoaded) {
@@ -36,6 +45,19 @@ export default function WaybackLayer({ year, onInfoLoaded, onError, onLayerReady
         }
       } catch (err) {
         console.error('Failed to load Wayback layer:', err);
+        // Use fallback URL on error
+        if (active) {
+          const fallbackUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+          setTileUrl(fallbackUrl);
+          setAttribution('Esri World Imagery (Fallback)');
+          if (onError) {
+            onError();
+          }
+        }
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
       }
     }
 
@@ -43,8 +65,11 @@ export default function WaybackLayer({ year, onInfoLoaded, onError, onLayerReady
 
     return () => {
       active = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  }, [year, onInfoLoaded]);
+  }, [year, onInfoLoaded, onError]);
 
   if (!tileUrl) return null;
 

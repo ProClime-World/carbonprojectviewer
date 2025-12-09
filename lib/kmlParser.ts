@@ -26,10 +26,21 @@ interface KMLPlacemark {
   };
 }
 
-export function parseKML(kmlContent: string, onProgress?: (progress: ParseProgress) => void): Polygon[] {
+export async function parseKML(kmlContent: string, onProgress?: (progress: ParseProgress) => void): Promise<Polygon[]> {
   console.log('🔍 Starting KML parsing...');
   console.log('📄 KML content length:', kmlContent.length);
   
+  // Validate input
+  if (!kmlContent || kmlContent.length === 0) {
+    throw new Error('KML content is empty');
+  }
+
+  // Limit content size to prevent memory issues (100MB max)
+  const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+  if (kmlContent.length > MAX_SIZE) {
+    throw new Error(`KML file too large (${(kmlContent.length / 1024 / 1024).toFixed(1)}MB). Maximum size is 100MB.`);
+  }
+
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
@@ -38,10 +49,20 @@ export function parseKML(kmlContent: string, onProgress?: (progress: ParseProgre
     trimValues: true,
     processEntities: true,
     htmlEntities: true,
+    // Add limits to prevent memory issues
+    parseNodeValue: false,
+    ignoreDeclaration: true,
+    ignorePiTags: true,
   });
 
   console.log('📊 Parsing XML...');
-  const result = parser.parse(kmlContent);
+  let result;
+  try {
+    result = parser.parse(kmlContent);
+  } catch (error) {
+    console.error('XML parsing error:', error);
+    throw new Error(`Failed to parse KML file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
   console.log('📊 XML parsed, result structure:', Object.keys(result));
   
   const polygons: Polygon[] = [];
@@ -78,58 +99,75 @@ export function parseKML(kmlContent: string, onProgress?: (progress: ParseProgre
   const totalPlacemarks = placemarks.length;
   let processed = 0;
 
-  for (const placemark of placemarks) {
-    if (!placemark) {
-      processed++;
-      continue;
+  // Process placemarks in chunks to prevent UI blocking
+  const CHUNK_SIZE = 100; // Process 100 placemarks at a time
+  
+  for (let chunkStart = 0; chunkStart < placemarks.length; chunkStart += CHUNK_SIZE) {
+    const chunk = placemarks.slice(chunkStart, chunkStart + CHUNK_SIZE);
+    
+    // Yield to browser every chunk to prevent blocking
+    if (chunkStart > 0 && chunkStart % (CHUNK_SIZE * 10) === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
-    // Debug: Log first few placemarks to understand structure
-    if (processed < 3) {
-      console.log('📊 Placemark structure:', Object.keys(placemark));
-      console.log('📊 Placemark name:', placemark.name);
-      console.log('📊 Has Polygon:', !!placemark.Polygon);
-      console.log('📊 Has MultiGeometry:', !!placemark.MultiGeometry);
-    }
+    for (const placemark of chunk) {
+      if (!placemark) {
+        processed++;
+        continue;
+      }
 
-    // Report progress
-    if (onProgress) {
-      onProgress({
-        processed,
-        total: totalPlacemarks,
-        currentPolygon: placemark.name || 'Unnamed Polygon',
-      });
-    }
+      // Debug: Log first few placemarks to understand structure
+      if (processed < 3) {
+        console.log('📊 Placemark structure:', Object.keys(placemark));
+        console.log('📊 Placemark name:', placemark.name);
+        console.log('📊 Has Polygon:', !!placemark.Polygon);
+        console.log('📊 Has MultiGeometry:', !!placemark.MultiGeometry);
+      }
 
-    const polygon = placemark.Polygon || placemark.MultiGeometry?.Polygon;
-    if (!polygon) {
-      processed++;
-      continue;
-    }
-
-    const polygonArray = Array.isArray(polygon) ? polygon : [polygon];
-
-    for (const poly of polygonArray) {
-      const outerBoundary = poly.outerBoundaryIs || poly.OuterBoundaryIs;
-      if (!outerBoundary?.LinearRing?.coordinates) continue;
-
-      const coordString = outerBoundary.LinearRing.coordinates;
-      const coordinates = parseCoordinates(coordString);
-
-      if (coordinates.length > 0) {
-        polygons.push({
-          name: placemark.name || 'Unnamed Polygon',
-          description: placemark.description,
-          coordinates: [coordinates],
+      // Report progress
+      if (onProgress) {
+        onProgress({
+          processed,
+          total: totalPlacemarks,
+          currentPolygon: placemark.name || 'Unnamed Polygon',
         });
       }
-    }
 
-    processed++;
+      try {
+        const polygon = placemark.Polygon || placemark.MultiGeometry?.Polygon;
+        if (!polygon) {
+          processed++;
+          continue;
+        }
 
-    // Log progress every 1000 placemarks
-    if (processed % 1000 === 0) {
-      console.log(`📊 Processed ${processed}/${totalPlacemarks} placemarks, found ${polygons.length} polygons`);
+        const polygonArray = Array.isArray(polygon) ? polygon : [polygon];
+
+        for (const poly of polygonArray) {
+          const outerBoundary = poly.outerBoundaryIs || poly.OuterBoundaryIs;
+          if (!outerBoundary?.LinearRing?.coordinates) continue;
+
+          const coordString = outerBoundary.LinearRing.coordinates;
+          const coordinates = parseCoordinates(coordString);
+
+          if (coordinates.length > 0) {
+            polygons.push({
+              name: placemark.name || 'Unnamed Polygon',
+              description: placemark.description,
+              coordinates: [coordinates],
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(`Error processing placemark ${processed}:`, error);
+        // Continue processing other placemarks
+      }
+
+      processed++;
+
+      // Log progress every 1000 placemarks
+      if (processed % 1000 === 0) {
+        console.log(`📊 Processed ${processed}/${totalPlacemarks} placemarks, found ${polygons.length} polygons`);
+      }
     }
   }
 

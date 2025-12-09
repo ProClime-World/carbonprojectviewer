@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 // Cache for 1 hour to reduce external API calls
 export const revalidate = 3600;
 export const dynamic = 'force-dynamic';
+
+// Maximum execution time for this route
+export const maxDuration = 10; // 10 seconds max
 
 function parseBbox(param: string | null): [number, number, number, number] | null {
   if (!param) return null;
@@ -37,7 +41,9 @@ export async function GET(req: Request) {
     // 2) Otherwise, use global releases list (from S3 config)
     if (!chosen) {
       const relUrl = 'https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json';
-      const r = await fetch(relUrl, { 
+      const r = await fetchWithTimeout(relUrl, { 
+        timeout: 5000, // 5 second timeout
+        retries: 2, // Retry twice on failure
         next: { revalidate: 3600 }, // Cache for 1 hour
         headers: {
           'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'
@@ -117,8 +123,19 @@ export async function GET(req: Request) {
     response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     return response;
   } catch (e) {
-    console.error(e);
-    return new Response('Wayback lookup failed', { status: 502 });
+    console.error('Wayback bybbox error:', e);
+    
+    // Return fallback response instead of error to prevent app crashes
+    const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const response = NextResponse.json({ 
+      url: baseFallback, 
+      attribution: 'Esri World Imagery (Fallback)', 
+      releaseId: null, 
+      releaseDate: null 
+    }, { status: 200 }); // Return 200 with fallback instead of 502
+    
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    return response;
   }
 }
 
