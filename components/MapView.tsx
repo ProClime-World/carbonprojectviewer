@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Coordinate } from '@/lib/kmlParser';
@@ -53,6 +53,9 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
   
   const [sliderPosition, setSliderPosition] = useState(50);
   const [rightLayer, setRightLayer] = useState<L.TileLayer | null>(null);
+  
+  // We need access to the map instance for dimensions
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -60,10 +63,22 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
 
   // Update clipping when slider or right layer changes
   useEffect(() => {
-    if (!rightLayer) return;
+    if (!rightLayer || !mapInstance) return;
     
     const container = rightLayer.getContainer();
-    if (!container) return;
+    if (!container) {
+      // Retry after a short delay if container not ready
+      const timeoutId = setTimeout(() => {
+        if (rightLayer && mapInstance) {
+          const retryContainer = rightLayer.getContainer();
+          if (retryContainer) {
+            // Re-run the effect by updating a dependency
+            setMapKey(prev => prev + 1);
+          }
+        }
+      }, 200);
+      return () => clearTimeout(timeoutId);
+    }
 
     // Clip the right layer (which is on top) to reveal the left layer
     // We clip the left side of the right layer
@@ -73,32 +88,76 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
     // Standard Leaflet SideBySide uses getRangeInput().value to set clip
     // CSS clip: rect(0, 9999px, 9999px, {position}px)
     
+    let updateTimeout: NodeJS.Timeout | null = null;
     const updateClip = () => {
-        const rect = mapInstance?.getContainer().getBoundingClientRect();
-        if (!rect) return;
-        
-        const width = rect.width;
-        const clipX = (width * sliderPosition) / 100;
-        
-        // Clip the left part of the right layer
-        container.style.clip = `rect(0, 9999px, 9999px, ${clipX}px)`;
+        // Debounce rapid updates
+        if (updateTimeout) {
+          clearTimeout(updateTimeout);
+        }
+        updateTimeout = setTimeout(() => {
+          const mapContainer = mapInstance.getContainer();
+          if (!mapContainer) return;
+          
+          const rect = mapContainer.getBoundingClientRect();
+          if (!rect || rect.width === 0) return;
+          
+          const width = rect.width;
+          const clipX = (width * sliderPosition) / 100;
+          
+          // Clip the left part of the right layer to show only from sliderPosition% to 100%
+          
+          // Calculate clip rect relative to the layer container
+          // The layer container might be offset relative to the map container
+          const layerRect = container.getBoundingClientRect();
+          const offsetX = layerRect.left - rect.left;
+          const offsetY = layerRect.top - rect.top;
+          
+          // We want the clip window to start at 'clipX' relative to the map container
+          // So relative to the layer container, it starts at 'clipX - offsetX'
+          // And extends to the right edge of the map container ('width - offsetX')
+          // Top is '-offsetY' and bottom is 'rect.height - offsetY'
+          
+          const clipLeft = clipX - offsetX;
+          const clipRight = width - offsetX;
+          const clipTop = -offsetY;
+          const clipBottom = rect.height - offsetY;
+          
+          container.style.clip = `rect(${clipTop}px, ${clipRight}px, ${clipBottom}px, ${clipLeft}px)`;
+          // Remove clipPath as it uses percentages relative to the element size, which is wrong for moving layers
+          container.style.clipPath = '';
+        }, 16); // ~60fps
     };
     
-    updateClip();
+    // Initial update with a small delay to ensure container is ready
+    const initTimeout = setTimeout(updateClip, 50);
     
-    // We also need to update on map move because the layer container might shift? 
-    // Actually L.TileLayer container usually stays fixed relative to map pane, but let's see.
-    // In Leaflet 1.x, the tile container moves with the map.
-    // The "leaflet-side-by-side" plugin updates clip on 'move' event.
+    // Update on map events that might affect positioning
+    mapInstance.on('move', updateClip);
+    mapInstance.on('zoom', updateClip);
+    mapInstance.on('resize', updateClip);
     
-    mapInstance?.on('move', updateClip);
+    // Also update when window resizes
+    const handleResize = () => {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(updateClip);
+    };
+    window.addEventListener('resize', handleResize);
+    
+    // Update when tiles load (might affect container size)
+    rightLayer.on('tileload', updateClip);
+    rightLayer.on('load', updateClip);
+    
     return () => {
-        mapInstance?.off('move', updateClip);
+        clearTimeout(initTimeout);
+        if (updateTimeout) clearTimeout(updateTimeout);
+        mapInstance.off('move', updateClip);
+        mapInstance.off('zoom', updateClip);
+        mapInstance.off('resize', updateClip);
+        window.removeEventListener('resize', handleResize);
+        rightLayer.off('tileload', updateClip);
+        rightLayer.off('load', updateClip);
     };
-  }, [sliderPosition, rightLayer]); // mapInstance added below
-
-  // We need access to the map instance for dimensions
-  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  }, [sliderPosition, rightLayer, mapInstance]);
 
   // Log year changes and force map update (if years change dynamically, though fixed for now)
   useEffect(() => {
@@ -157,13 +216,13 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
     }
   }, [polygons, selectedIndex]);
 
-  const handleLeftLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
+  const handleLeftLoaded = useCallback((info: { releaseDate: string | null; releaseId: number | null }) => {
     setLeftInfo(info);
-  };
+  }, []);
 
-  const handleRightLoaded = (info: { releaseDate: string | null; releaseId: number | null }) => {
+  const handleRightLoaded = useCallback((info: { releaseDate: string | null; releaseId: number | null }) => {
     setRightInfo(info);
-  };
+  }, []);
 
   if (!isMounted) {
     return (
@@ -181,11 +240,14 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
       <div className="absolute inset-0 z-[401] pointer-events-none flex items-center justify-center">
         {/* Slider Line */}
         <div 
-            className="absolute top-0 bottom-0 w-1 bg-white shadow-md pointer-events-auto cursor-ew-resize hover:bg-gray-100 transition-colors"
-            style={{ left: `${sliderPosition}%` }}
+            className="absolute top-0 bottom-0 w-1 bg-white shadow-md pointer-events-none cursor-ew-resize hover:bg-gray-100 transition-colors"
+            style={{ 
+              left: `${sliderPosition}%`,
+              transform: 'translateX(-50%)'
+            }}
         >
              {/* Handle */}
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center border border-gray-200 pointer-events-auto">
                 <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" transform="rotate(90 12 12)" />
                 </svg>
@@ -198,7 +260,10 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
             min="0"
             max="100"
             value={sliderPosition}
-            onChange={(e) => setSliderPosition(Number(e.target.value))}
+            onChange={(e) => {
+              const newPosition = Number(e.target.value);
+              setSliderPosition(newPosition);
+            }}
             className="absolute inset-0 w-full h-full opacity-0 pointer-events-auto cursor-ew-resize"
             style={{ margin: 0 }}
         />
@@ -240,20 +305,24 @@ export default function MapView({ polygons, yearLeft = 2017, yearRight = 2024, s
         className="z-0"
         ref={setMapInstance}
       >
-        {/* Left Layer (Bottom) */}
+        {/* Left Layer (Bottom) - 2017 */}
         <WaybackLayer
+          key={`left-${yearLeft}`}
           year={yearLeft}
           onInfoLoaded={handleLeftLoaded}
           onError={() => setShowResolutionWarning(true)}
+          zIndex={1}
         />
         
-        {/* Right Layer (Top, clipped) */}
+        {/* Right Layer (Top, clipped) - 2024 */}
         <WaybackLayer
+          key={`right-${yearRight}`}
           year={yearRight}
           onInfoLoaded={handleRightLoaded}
           onLayerReady={setRightLayer}
           className="z-[200]" // Ensure it's on top if using standard panes
           onError={() => setShowResolutionWarning(true)}
+          zIndex={10}
         />
 
         {/* Polygons (Always on top of imagery) */}

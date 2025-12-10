@@ -41,7 +41,7 @@ export async function GET(_req: Request) {
     if (PREFERRED_RELEASES[year]) {
       const rid = PREFERRED_RELEASES[year];
       const item = data[rid.toString()];
-      if (item) {
+      if (item && item.itemURL) {
         const match = item.itemTitle.match(/Wayback (\d{4}-\d{2}-\d{2})/);
         const tileUrl = item.itemURL
             .replace('{level}', '{z}')
@@ -55,6 +55,8 @@ export async function GET(_req: Request) {
           releaseDate: match ? match[1] : null,
         });
       }
+      // If preferred release doesn't exist, fall through to candidate search
+      console.log(`Preferred release ${rid} for year ${year} not found, searching candidates...`);
     }
 
     const targetTs = new Date(`${year}-07-01T12:00:00Z`).getTime();
@@ -108,6 +110,13 @@ export async function GET(_req: Request) {
 
   } catch (err) {
     console.error('Wayback endpoint error:', err);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    // Return fallback instead of error to ensure app continues working
+    const baseFallback = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    return NextResponse.json({
+      url: baseFallback,
+      attribution: 'Esri World Imagery (Fallback)',
+      releaseId: null,
+      releaseDate: null,
+    });
   }
 }
